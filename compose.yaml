@@ -1,0 +1,697 @@
+name: homelab
+
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=86400
+      - WATCHTOWER_LABEL_ENABLE=true
+      - TZ=${TZ}
+    labels:
+      # Kuma (Docker host is socket-proxy via TCP)
+      - kuma.watchtower.docker.name=Watchtower
+      - kuma.watchtower.docker.docker_container=watchtower
+      - kuma.watchtower.docker.docker_host_name=socket_proxy_docker_host
+
+  cloudflare-ddns:
+    image: favonia/cloudflare-ddns:latest
+    container_name: cloudflare-ddns
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - all
+    environment:
+      - TZ=${TZ}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - DOMAINS=${DOMAIN},*.${DOMAIN}
+      - PROXIED=true
+      - DETECTION_MODE=cloudflare.trace
+      - HTTP_TIMEOUT=10s
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Kuma (Docker host is socket-proxy via TCP)
+      - kuma.cloudflare-ddns.docker.name=Cloudflare DDNS
+      - kuma.cloudflare-ddns.docker.docker_container=cloudflare-ddns
+      - kuma.cloudflare-ddns.docker.docker_host_name=socket_proxy_docker_host
+
+  socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:latest
+    container_name: socket-proxy
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - socket_proxy
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    read_only: true
+    tmpfs:
+      - /run
+    environment:
+      - LOG_LEVEL=warning
+      - ALLOW_START=1
+      - ALLOW_STOP=1
+      - ALLOW_RESTARTS=1
+      - EVENTS=1
+      - PING=1
+      - VERSION=1
+      - AUTH=0
+      - SECRETS=0
+      - POST=1
+      - BUILD=0
+      - COMMIT=0
+      - CONFIGS=0
+      - CONTAINERS=1
+      - DISTRIBUTION=0
+      - EXEC=0
+      - IMAGES=1
+      - INFO=1
+      - NETWORKS=1
+      - NODES=0
+      - PLUGINS=0
+      - SERVICES=1
+      - SESSION=0
+      - SWARM=0
+      - SYSTEM=0
+      - TASKS=1
+      - VOLUMES=1
+      - DISABLE_IPV6=0
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Kuma – single Docker host via socket-proxy (TCP); container monitors reference this
+      - kuma.socket_proxy_docker_host.docker_host.name=Socket Proxy (Docker)
+      - kuma.socket_proxy_docker_host.docker_host.connection_type=tcp
+      - kuma.socket_proxy_docker_host.docker_host.path=tcp://socket-proxy:2375
+
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik_network
+      - socket_proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - CF_DNS_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - DOCKER_HOST=tcp://socket-proxy:2375
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DATA_DIR}/traefik/acme/acme.json:/acme.json
+    command:
+      - --entrypoints.traefik.address=:8080
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --ping=true
+      - --ping.entryPoint=traefik
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.network=traefik_network
+      - --entrypoints.web.http.redirections.entryPoint.to=websecure
+      - --entrypoints.web.http.redirections.entryPoint.scheme=https
+      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.cloudflare.acme.storage=/acme.json
+    labels:
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/authz/forward-auth?rd=https://auth.${DOMAIN}/
+      - traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true
+      - traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Name,Remote-Email
+      - traefik.http.routers.traefik-dash.rule=Host(`traefik.${DOMAIN}`)
+      - traefik.http.routers.traefik-dash.service=api@internal
+      - traefik.http.routers.traefik-dash.entrypoints=websecure
+      - traefik.http.routers.traefik-dash.tls.certresolver=cloudflare
+      - traefik.http.routers.traefik-dash.middlewares=authelia
+      # Kuma
+      - kuma.traefik.http.name=Traefik
+      - kuma.traefik.http.url=http://traefik:8080/ping
+      - kuma.traefik.http.interval=60
+
+  authelia:
+    image: authelia/authelia:latest
+    container_name: authelia
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    networks:
+      - traefik_network
+    volumes:
+      - ${DATA_DIR}/authelia/config:/config
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.authelia.rule=Host(`auth.${DOMAIN}`)
+      - traefik.http.routers.authelia.entrypoints=websecure
+      - traefik.http.routers.authelia.tls.certresolver=cloudflare
+      # Kuma
+      - kuma.authelia.http.name=Authelia
+      - kuma.authelia.http.url=http://authelia:9091/api/health
+      - kuma.authelia.http.interval=60
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:2
+    container_name: uptime-kuma
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik_network
+      - socket_proxy
+    environment:
+      - DOCKER_HOST=tcp://socket-proxy:2375
+      - TZ=${TZ}
+    volumes:
+      - ${DATA_DIR}/uptime-kuma/data:/app/data
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.uptime.rule=Host(`status.${DOMAIN}`)
+      - traefik.http.routers.uptime.entrypoints=websecure
+      - traefik.http.routers.uptime.tls=true
+      - traefik.http.routers.uptime.tls.certresolver=cloudflare
+      - traefik.http.routers.uptime.middlewares=authelia@docker
+      - traefik.http.services.uptime.loadbalancer.server.port=3001
+
+  autokuma:
+    image: ghcr.io/bigboot/autokuma:latest
+    container_name: autokuma
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    environment:
+      - AUTOKUMA__KUMA__URL=http://uptime-kuma:3001
+      - AUTOKUMA__DOCKER__HOSTS=tcp://socket-proxy:2375
+      - AUTOKUMA__KUMA__SYNC_INTERVAL=60
+      - TZ=${TZ}
+    volumes:
+      - ${DATA_DIR}/autokuma/data:/data
+    networks:
+      - traefik_network
+      - socket_proxy
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    networks:
+      - traefik_network
+      - socket_proxy
+    environment:
+      - DOZZLE_LEVEL=info
+      - DOZZLE_FILTER=status=running
+      - DOZZLE_REMOTE_HOST=tcp://socket-proxy:2375
+      - DOZZLE_AUTH_PROVIDER=forward-proxy
+      - DOZZLE_AUTH_HEADER_USER=Remote-User
+      - TZ=${TZ}
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.dozzle.rule=Host(`logs.${DOMAIN}`)
+      - traefik.http.routers.dozzle.entrypoints=websecure
+      - traefik.http.routers.dozzle.tls=true
+      - traefik.http.routers.dozzle.tls.certresolver=cloudflare
+      - traefik.http.routers.dozzle.middlewares=authelia@docker
+      - traefik.http.services.dozzle.loadbalancer.server.port=8080
+      # Kuma (Docker host is socket-proxy via TCP)
+      - kuma.dozzle.docker.name=Dozzle
+      - kuma.dozzle.docker.docker_container=dozzle
+      - kuma.dozzle.docker.docker_host_name=socket_proxy_docker_host
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    user: "${PUID}:983"
+    networks:
+      - traefik_network
+      - socket_proxy
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - HOMEPAGE_ALLOWED_HOSTS=home.${DOMAIN},192.168.90.0/24
+      - DOCKER_HOST=tcp://socket-proxy:2375
+    volumes:
+      - ${DATA_DIR}/homepage/config:/app/config
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.homepage.rule=Host(`home.${DOMAIN}`)
+      - traefik.http.routers.homepage.entrypoints=websecure
+      - traefik.http.routers.homepage.tls=true
+      - traefik.http.routers.homepage.tls.certresolver=cloudflare
+      - traefik.http.routers.homepage.middlewares=authelia@docker
+      - traefik.http.services.homepage.loadbalancer.server.port=3000
+      # Kuma
+      - kuma.homepage.http.name=Homepage
+      - kuma.homepage.http.url=http://homepage:3000
+      - kuma.homepage.http.interval=60
+
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    group_add:
+      - "991"
+    networks:
+      - traefik_network
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - ${DATA_DIR}/jellyfin/config:/config
+      - ${DATA_DIR}/jellyfin/cache:/cache
+      - ${DATA_DIR}/jellyfin/logs:/logs
+      - ${MEDIA1_DIR}:/media
+      - ${MEDIA2_DIR}:/media2
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.jellyfin.rule=Host(`tv.${DOMAIN}`)
+      - traefik.http.routers.jellyfin.entrypoints=websecure
+      - traefik.http.routers.jellyfin.tls=true
+      - traefik.http.routers.jellyfin.tls.certresolver=cloudflare
+      - traefik.http.services.jellyfin.loadbalancer.server.port=8096
+      # Kuma
+      - kuma.jellyfin.http.name=Jellyfin
+      - kuma.jellyfin.http.url=http://jellyfin:8096
+      - kuma.jellyfin.http.interval=60
+
+  audiobookshelf:
+    image: advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    networks:
+      - traefik_network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 80 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+    mem_limit: 4g
+    cpu_shares: 768
+    security_opt:
+      - no-new-privileges:true
+    restart: on-failure:5
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${AUDIOBOOKS_DIR}:/audiobooks
+      - ${DATA_DIR}/audiobookshelf/config:/config
+      - ${DATA_DIR}/audiobookshelf/metadata:/metadata
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.audiobooks.rule=Host(`books.${DOMAIN}`)
+      - traefik.http.routers.audiobooks.entrypoints=websecure
+      - traefik.http.routers.audiobooks.tls=true
+      - traefik.http.routers.audiobooks.tls.certresolver=cloudflare
+      - traefik.http.services.audiobooks.loadbalancer.server.port=80
+      # Kuma
+      - kuma.audiobooks.http.name=Audiobookshelf
+      - kuma.audiobooks.http.url=http://audiobookshelf:80
+      - kuma.audiobooks.http.interval=60
+
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    container_name: mealie
+    restart: unless-stopped
+    networks:
+      - traefik_network
+    volumes:
+      - ${DATA_DIR}/mealie/data:/app/data
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - BASE_URL=https://food.${DOMAIN}
+      - OIDC_AUTH_ENABLED=true
+      - OIDC_SIGNUP_ENABLED=true
+      - OIDC_CONFIGURATION_URL=https://auth.${DOMAIN}/.well-known/openid-configuration
+      - OIDC_CLIENT_ID=mealie
+      - OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - OIDC_AUTO_REDIRECT=false
+      - OIDC_ADMIN_GROUP=mealie-admins
+      - OIDC_USER_GROUP=mealie-users
+      - OIDC_USER_CLAIM=email
+      - OIDC_NAME_CLAIM=name
+      - OIDC_GROUPS_CLAIM=groups
+      - OPENAI_API_KEY=${MEALIE_OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o
+      - OPENAI_ENABLE_IMAGE_SERVICES=true
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.mealie.rule=Host(`food.${DOMAIN}`)
+      - traefik.http.routers.mealie.entrypoints=websecure
+      - traefik.http.routers.mealie.tls=true
+      - traefik.http.routers.mealie.tls.certresolver=cloudflare
+      # Kuma
+      - kuma.mealie.http.name=Mealie
+      - kuma.mealie.http.url=http://mealie:9000
+      - kuma.mealie.http.interval=60
+
+  wallos:
+    image: bellamy/wallos:latest
+    container_name: wallos
+    restart: unless-stopped
+    networks:
+      - traefik_network
+    environment:
+      - TZ=${TZ}
+      - PUID=${PUID}
+      - PGID=${PGID}
+    volumes:
+      - ${DATA_DIR}/wallos/db:/var/www/html/db
+      - ${DATA_DIR}/wallos/logos:/var/www/html/images/uploads/logos
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.wallos.rule=Host(`wallos.${DOMAIN}`)
+      - traefik.http.routers.wallos.entrypoints=websecure
+      - traefik.http.routers.wallos.tls=true
+      - traefik.http.routers.wallos.tls.certresolver=cloudflare
+      # Kuma
+      - kuma.wallos.http.name=Wallos
+      - kuma.wallos.http.url=http://wallos:80
+      - kuma.wallos.http.interval=60
+
+  trilium:
+    image: triliumnext/trilium:latest
+    container_name: trilium
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik_network
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - TRILIUM_DATA_DIR=/home/node/trilium-data
+      - TRILIUM_OAUTH_BASE_URL=https://notes.${DOMAIN}
+      - TRILIUM_OAUTH_CLIENT_ID=trilium
+      - TRILIUM_OAUTH_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - TRILIUM_OAUTH_ISSUER_BASE_URL=https://auth.${DOMAIN}
+      - TRILIUM_OAUTH_ISSUER_NAME=Authelia
+    volumes:
+      - ${DATA_DIR}/trilium/data:/home/node/trilium-data
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.trilium.rule=Host(`notes.${DOMAIN}`)
+      - traefik.http.routers.trilium.entrypoints=websecure
+      - traefik.http.routers.trilium.tls=true
+      - traefik.http.routers.trilium.tls.certresolver=cloudflare
+      # Kuma
+      - kuma.trilium.http.name=Trilium
+      - kuma.trilium.http.url=http://trilium:8080
+      - kuma.trilium.http.interval=60
+
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    restart: unless-stopped
+    environment:
+      - LOG_LEVEL=info
+      - TZ=${TZ}
+      - PUID=${PUID}
+      - PGID=${PGID}
+    networks:
+      - traefik_network
+    volumes:
+      - ${DATA_DIR}/jellyseerr/config:/app/config
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.${DOMAIN}`)
+      - traefik.http.routers.jellyseerr.entrypoints=websecure
+      - traefik.http.routers.jellyseerr.tls=true
+      - traefik.http.routers.jellyseerr.tls.certresolver=cloudflare
+      - traefik.http.routers.jellyseerr.middlewares=authelia@docker
+      # Kuma
+      - kuma.jellyseerr.http.name=Jellyseerr
+      - kuma.jellyseerr.http.url=http://jellyseerr:5055
+      - kuma.jellyseerr.http.interval=60
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=mullvad
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      - WIREGUARD_ADDRESSES=10.69.39.234/32
+      - SERVER_CITIES=Gothenburg,Malmö,Stockholm
+      - DOT=off
+      - DNS_ADDRESS=10.64.0.1
+      - HTTP_CONTROL_SERVER_ADDRESS=:8000
+      - HTTP_CONTROL_SERVER_LOG=on
+      - HTTPPROXY=on
+      - FIREWALL_OUTBOUND_SUBNETS=192.168.90.0/24
+    ports:
+      - 8888:8888/tcp
+      - 8080:8000/tcp
+      - 8989:8989/tcp
+      - 7878:7878/tcp
+      - 9696:9696/tcp
+      - 9865:9865/tcp
+    networks:
+      - traefik_network
+    restart: unless-stopped
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.docker.network=traefik_network
+      - traefik.http.routers.gluetun-api.rule=Host(`vpn-status.${DOMAIN}`)
+      - traefik.http.routers.gluetun-api.entrypoints=websecure
+      - traefik.http.routers.gluetun-api.tls=true
+      - traefik.http.routers.gluetun-api.tls.certresolver=cloudflare
+      - traefik.http.routers.gluetun-api.middlewares=authelia@docker
+      - traefik.http.routers.gluetun-api.service=gluetun-api
+      - traefik.http.services.gluetun-api.loadbalancer.server.port=8000
+      - traefik.http.routers.qbittorrent.rule=Host(`torrents.${DOMAIN}`)
+      - traefik.http.routers.qbittorrent.entrypoints=websecure
+      - traefik.http.routers.qbittorrent.tls=true
+      - traefik.http.routers.qbittorrent.tls.certresolver=cloudflare
+      - traefik.http.routers.qbittorrent.middlewares=authelia@docker
+      - traefik.http.routers.qbittorrent.service=qbittorrent-service
+      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=9865
+      - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)
+      - traefik.http.routers.sonarr.entrypoints=websecure
+      - traefik.http.routers.sonarr.tls=true
+      - traefik.http.routers.sonarr.tls.certresolver=cloudflare
+      - traefik.http.routers.sonarr.middlewares=authelia@docker
+      - traefik.http.routers.sonarr.service=sonarr-service
+      - traefik.http.services.sonarr-service.loadbalancer.server.port=8989
+      - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)
+      - traefik.http.routers.radarr.entrypoints=websecure
+      - traefik.http.routers.radarr.tls=true
+      - traefik.http.routers.radarr.tls.certresolver=cloudflare
+      - traefik.http.routers.radarr.middlewares=authelia@docker
+      - traefik.http.routers.radarr.service=radarr-service
+      - traefik.http.services.radarr-service.loadbalancer.server.port=7878
+      - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`)
+      - traefik.http.routers.prowlarr.entrypoints=websecure
+      - traefik.http.routers.prowlarr.tls=true
+      - traefik.http.routers.prowlarr.tls.certresolver=cloudflare
+      - traefik.http.routers.prowlarr.middlewares=authelia@docker
+      - traefik.http.routers.prowlarr.service=prowlarr-service
+      - traefik.http.services.prowlarr-service.loadbalancer.server.port=9696
+      - traefik.http.routers.bazarr.rule=Host(`bazarr.${DOMAIN}`)
+      - traefik.http.routers.bazarr.entrypoints=websecure
+      - traefik.http.routers.bazarr.tls=true
+      - traefik.http.routers.bazarr.tls.certresolver=cloudflare
+      - traefik.http.routers.bazarr.middlewares=authelia@docker
+      - traefik.http.routers.bazarr.service=bazarr-service
+      - traefik.http.services.bazarr-service.loadbalancer.server.port=6767
+      # Kuma
+      - kuma.vpn.port.name=VPN Gateway
+      - kuma.vpn.port.hostname=gluetun
+      - kuma.vpn.port.port=8000
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    network_mode: "service:gluetun"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - WEBUI_PORT=9865
+    volumes:
+      - ${DATA_DIR}/qbittorrent/config:/config
+      - ${DOWNLOADS_DIR}:/downloads
+    restart: unless-stopped
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Kuma
+      - kuma.qbittorrent.http.name=qBittorrent
+      - kuma.qbittorrent.http.url=http://gluetun:9865/api/v2/app/version
+
+  sonarr:
+    image: ghcr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DATA_DIR}/sonarr/config:/config
+      - ${MEDIA1_DIR}:/media
+      - ${MEDIA2_DIR}:/media2
+      - ${DOWNLOADS_DIR}:/downloads
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Kuma (override KUMA_SONARR_URL in .env if /ping not supported)
+      - kuma.sonarr.http.name=Sonarr
+      - kuma.sonarr.http.url=${KUMA_SONARR_URL:-http://gluetun:8989/ping}
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DATA_DIR}/radarr/config:/config
+      - ${MEDIA1_DIR}:/media
+      - ${MEDIA2_DIR}:/media2
+      - ${DOWNLOADS_DIR}:/downloads
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Kuma
+      - kuma.radarr.http.name=Radarr
+      - kuma.radarr.http.url=${KUMA_RADARR_URL:-http://gluetun:7878/ping}
+
+  prowlarr:
+    image: ghcr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DATA_DIR}/prowlarr/config:/config
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Kuma
+      - kuma.prowlarr.http.name=Prowlarr
+      - kuma.prowlarr.http.url=${KUMA_PROWLARR_URL:-http://gluetun:9696/ping}
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${DATA_DIR}/bazarr/config:/config
+      - ${MEDIA1_DIR}:/media
+      - ${MEDIA2_DIR}:/media2
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Kuma
+      - kuma.bazarr.http.name=Bazarr
+      - kuma.bazarr.http.url=${KUMA_BAZARR_URL:-http://gluetun:6767/api/system/status}
+
+networks:
+  default:
+    driver: bridge
+  socket_proxy:
+    name: socket_proxy
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.91.0/24
+  traefik_network:
+    name: traefik_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.90.0/24
