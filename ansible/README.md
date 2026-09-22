@@ -150,8 +150,8 @@ ansible-playbook playbooks/deploy-dispatcharr.yml
 DISPATCHARR_ADMIN_USERNAME=mike
 DISPATCHARR_ADMIN_PASSWORD=your-secure-password
 DISPATCHARR_ADMIN_EMAIL=mike@example.com
-DISPATCHARR_M3U_NAME=Strong8k
-DISPATCHARR_M3U_URL=http://cf.strong8high.xyz
+DISPATCHARR_M3U_NAME=MyProvider
+DISPATCHARR_M3U_URL=http://your-provider.example.com
 DISPATCHARR_M3U_USERNAME=your-provider-username
 DISPATCHARR_M3U_PASSWORD=your-provider-password
 DISPATCHARR_M3U_ACCOUNT_TYPE=XC
