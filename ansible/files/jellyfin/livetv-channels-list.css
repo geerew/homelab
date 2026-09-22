@@ -1,0 +1,224 @@
+/* Live TV: channel grid → list layout (Jellyfin 12+) */
+
+#liveTvPage,
+#liveTvPage .padded-bottom-page,
+#liveTvPage .itemsContainer.vertical-wrap,
+#channelsTab .vertical-wrap {
+    overflow: visible !important;
+}
+
+#liveTvPage .itemsContainer.vertical-wrap,
+#channelsTab .vertical-wrap {
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+#liveTvPage .card[data-context="livetv"],
+#channelsTab .squareCard,
+#channelsTab .card {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0.1em 0 !important;
+    padding: 0.5em 0.75em !important;
+    position: relative !important;
+    cursor: pointer;
+    border-radius: 4px;
+    overflow: visible !important;
+    contain: none !important;
+    transition: background-color 0.15s ease;
+}
+
+#liveTvPage .card[data-context="livetv"]:hover,
+#liveTvPage .card[data-context="livetv"]:focus-within,
+#channelsTab .card-hoverable:hover,
+#channelsTab .card-hoverable:focus-within {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardBox,
+#channelsTab .cardBox {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    flex-shrink: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto;
+    position: static !important;
+    overflow: visible !important;
+    contain: none !important;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardBox-bottompadded,
+#channelsTab .cardBox-bottompadded {
+    margin-bottom: 0 !important;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardScalable,
+#channelsTab .cardScalable {
+    width: 80px !important;
+    min-width: 80px !important;
+    height: 45px !important;
+    flex-shrink: 0;
+    position: relative;
+    overflow: visible !important;
+    contain: none !important;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardPadder-square,
+#channelsTab .cardPadder-square {
+    padding-bottom: 0 !important;
+    height: 0 !important;
+    overflow: hidden;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardScalable .cardContent,
+#liveTvPage .card[data-context="livetv"] .cardScalable .cardImageContainer,
+#channelsTab .cardScalable .cardContent,
+#channelsTab .cardScalable .cardImageContainer {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+    height: 45px !important;
+    width: 80px !important;
+    background-size: contain !important;
+    background-position: center left !important;
+    background-color: transparent !important;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardScalable .defaultCardBackground1,
+#liveTvPage .card[data-context="livetv"] .cardScalable .defaultCardBackground2,
+#liveTvPage .card[data-context="livetv"] .cardScalable .defaultCardBackground3,
+#liveTvPage .card[data-context="livetv"] .cardScalable .defaultCardBackground4,
+#liveTvPage .card[data-context="livetv"] .cardScalable .defaultCardBackground5,
+#channelsTab .cardScalable .defaultCardBackground1,
+#channelsTab .cardScalable .defaultCardBackground2,
+#channelsTab .cardScalable .defaultCardBackground3,
+#channelsTab .cardScalable .defaultCardBackground4,
+#channelsTab .cardScalable .defaultCardBackground5 {
+    background-color: transparent !important;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardDefaultText,
+#channelsTab .cardDefaultText {
+    display: none !important;
+}
+
+/* Full-row click target (overlay escapes cardBox onto the card) */
+#liveTvPage .card[data-context="livetv"] .cardOverlayContainer,
+#channelsTab .cardOverlayContainer {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+    contain: none !important;
+    pointer-events: none;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardOverlayContainer > a.cardImageContainer,
+#channelsTab .cardOverlayContainer > a.cardImageContainer {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 1;
+    pointer-events: auto;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardOverlayContainer > button,
+#liveTvPage .card[data-context="livetv"] .cardOverlayContainer > .cardOverlayButton-br,
+#channelsTab .cardOverlayContainer > button,
+#channelsTab .cardOverlayContainer > .cardOverlayButton-br {
+    pointer-events: auto;
+    z-index: 2;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardOverlayContainer > .cardOverlayFab-primary,
+#channelsTab .cardOverlayContainer > .cardOverlayFab-primary {
+    position: absolute !important;
+    top: 50% !important;
+    right: 3.25em !important;
+    left: auto !important;
+    width: 2.25em !important;
+    height: 2.25em !important;
+    margin: 0 !important;
+    transform: translateY(-50%) !important;
+    background-color: transparent !important;
+    opacity: 0;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+#liveTvPage .card[data-context="livetv"]:hover .cardOverlayContainer > .cardOverlayFab-primary,
+#liveTvPage .card[data-context="livetv"]:focus-within .cardOverlayContainer > .cardOverlayFab-primary,
+#channelsTab .card-hoverable:hover .cardOverlayContainer > .cardOverlayFab-primary,
+#channelsTab .card-hoverable:focus-within .cardOverlayContainer > .cardOverlayFab-primary {
+    opacity: 1;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardOverlayContainer > .cardOverlayFab-primary:hover,
+#channelsTab .cardOverlayContainer > .cardOverlayFab-primary:hover {
+    background-color: rgba(0, 164, 220, 0.2) !important;
+    color: #00a4dc;
+    transform: translateY(-50%) !important;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardOverlayButton-br,
+#channelsTab .cardOverlayButton-br {
+    position: absolute !important;
+    top: 50% !important;
+    right: 0 !important;
+    bottom: auto !important;
+    left: auto !important;
+    transform: translateY(-50%) !important;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    z-index: 3;
+}
+
+/* Channel title — let clicks pass through to the full-row link */
+#liveTvPage .card[data-context="livetv"] .cardText-first,
+#channelsTab .cardFooter {
+    flex: 1;
+    min-width: 0;
+    padding: 0 6.5em 0 0.65em !important;
+    text-align: left !important;
+    pointer-events: none;
+    z-index: 0;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardText-first .cardText,
+#liveTvPage .card[data-context="livetv"] .cardText-first a,
+#channelsTab .cardFooter .cardText {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    width: auto !important;
+    font-size: 1.05rem !important;
+    line-height: 1.45 !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left !important;
+    pointer-events: none;
+}
+
+#liveTvPage .card[data-context="livetv"] .cardText-secondary,
+#channelsTab .cardFooter .cardText-secondary {
+    display: none !important;
+}
+
+#channelsTab .cardFooter-withlogo {
+    padding-left: 0 !important;
+}
+
+#channelsTab .cardFooterLogo {
+    display: none;
+}

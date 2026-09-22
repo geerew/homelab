@@ -1,0 +1,59 @@
+---
+- name: Deploy Jellyfin
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    jellyfin_css_dir: "{{ playbook_dir }}/../files/jellyfin"
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Jellyfin variables in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DOMAIN is defined
+          - homelab_env.DOMAIN | length > 0
+        fail_msg: >-
+          Set DOMAIN in {{ env_file }} (see .env.example).
+      when: not ansible_check_mode
+
+    - name: Ensure Jellyfin config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/jellyfin/config/config"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Render branding.xml from template
+      ansible.builtin.template:
+        src: ../templates/jellyfin/branding.xml.j2
+        dest: "{{ data_dir }}/services/jellyfin/config/config/branding.xml"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      register: jellyfin_branding_config
+
+    - name: Restart Jellyfin to pick up branding changes
+      community.docker.docker_container:
+        name: jellyfin
+        state: started
+        restart: true
+      when:
+        - not ansible_check_mode
+        - jellyfin_branding_config.changed
+
+    - name: Report Jellyfin deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to render Jellyfin branding.xml into
+          {{ data_dir }}/services/jellyfin/config/config/.
+          {% elif jellyfin_branding_config.changed %}
+          Deployed Jellyfin branding.xml (custom CSS + Live TV channel list) and restarted Jellyfin. Hard-refresh the browser to pick up changes.
+          {% else %}
+          Jellyfin config unchanged — no restart needed.
+          {% endif %}

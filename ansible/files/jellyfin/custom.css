@@ -1,0 +1,30 @@
+@import url("https://cdn.jsdelivr.net/gh/intro-skipper/intro-skipper-css@main/skip-button.min.css");
+
+/* Style the Authelia button to match Jellyfin theme */
+.authelia-sso-button {
+    background: #00a4dc; /* Jellyfin Blue - change to #ff7d20 for Authelia Orange if preferred */
+    color: white !important;
+    text-decoration: none;
+    display: block;
+    padding: 0.75em;
+    margin-top: 1em;
+    border-radius: 5px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.authelia-sso-button:hover {
+    background: #008fbf;
+    filter: brightness(1.1);
+}
+
+/* Ensure the disclaimer container doesn't look weird */
+.disclaimerContainer {
+    display: block;
+    margin-top: 1em;
+}
+
+:root {
+    /* Skip button timing */
+    --skip-hide-duration: 8s;
+}

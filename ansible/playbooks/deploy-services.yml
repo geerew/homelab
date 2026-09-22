@@ -7,3 +7,6 @@
 
 - name: Deploy Homepage
   ansible.builtin.import_playbook: deploy-homepage.yml
+
+- name: Deploy Jellyfin
+  ansible.builtin.import_playbook: deploy-jellyfin.yml

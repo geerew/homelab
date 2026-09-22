@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<BrandingOptions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <LoginDisclaimer>&lt;a href="https://tv.{{ homelab_env.DOMAIN }}/sso/OID/start/authelia" class="raised block emby-button authelia-sso-button"&gt;
+  &lt;span&gt;Login with Authelia&lt;/span&gt;
+&lt;/a&gt;</LoginDisclaimer>
+  <CustomCss>{{ lookup('file', jellyfin_css_dir ~ '/custom.css') }}
+{{ lookup('file', jellyfin_css_dir ~ '/livetv-channels-list.css') }}</CustomCss>
+  <SplashscreenEnabled>false</SplashscreenEnabled>
+</BrandingOptions>

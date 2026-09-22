@@ -27,7 +27,8 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + EPL/sports channels (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
-| `playbooks/deploy-services.yml` | Dispatcharr + Gluetun + Homepage |
+| `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, custom CSS, Live TV channel list) |
+| `playbooks/deploy-services.yml` | Dispatcharr + Gluetun + Homepage + Jellyfin |
 
 ## Usage
 
@@ -46,7 +47,10 @@ ansible-playbook playbooks/deploy-gluetun.yml
 # Deploy Homepage config (widget creds/keys from .env)
 ansible-playbook playbooks/deploy-homepage.yml
 
-# Deploy all app services (Dispatcharr + Gluetun + Homepage)
+# Deploy Jellyfin config (custom CSS, Live TV channel list)
+ansible-playbook playbooks/deploy-jellyfin.yml
+
+# Deploy all app services (Dispatcharr + Gluetun + Homepage + Jellyfin)
 ansible-playbook playbooks/deploy-services.yml
 ```
 
@@ -76,6 +80,18 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Gluetun | `GLUETUN_API_KEY` |
 
 Gluetun `config.toml` is generated to `services/gluetun/config.toml` (gitignored) and bind-mounted into the container at `/gluetun/auth/config.toml`.
+
+### Jellyfin branding
+
+Custom CSS and the Live TV channel list layout deploy to `services/jellyfin/config/config/branding.xml` (gitignored):
+
+| Content | Source |
+| --- | --- |
+| Intro Skipper, Authelia SSO button | [`files/jellyfin/custom.css`](files/jellyfin/custom.css) |
+| Live TV channel list layout | [`files/jellyfin/livetv-channels-list.css`](files/jellyfin/livetv-channels-list.css) |
+| `branding.xml` wrapper | [`templates/jellyfin/branding.xml.j2`](templates/jellyfin/branding.xml.j2) |
+
+Edit the Ansible sources, then run `deploy-jellyfin.yml`. Do not edit `branding.xml` in the Jellyfin UI — changes will be overwritten on the next deploy. Jellyfin caches branding at startup, so the playbook restarts the container when `branding.xml` changes; hard-refresh the browser after deploy.
 
 ### Migrating data to `services/`
 
@@ -155,6 +171,8 @@ Dispatcharr runs **outside** Gluetun so IPTV provider traffic uses your home IP 
 ### Jellyfin Live TV
 
 Add an **HDHomeRun** tuner at `http://dispatcharr:9191/hdhr` (not `gluetun:9191`). If Dispatcharr was moved off the VPN, update the tuner URL in **Dashboard → Live TV** and refresh channels — Jellyfin caches stream URLs and will fail with `Connection refused (gluetun:9191)` until re-scanned.
+
+The Live TV channel list uses a list layout via custom CSS in `files/jellyfin/livetv-channels-list.css` (deployed by `deploy-jellyfin.yml`). The rules target Jellyfin 12+ (`#liveTvPage` and `#channelsTab`, flex row cards). Tweak that file if logos or text overlap on your screen size.
 
 ## Notes
 
