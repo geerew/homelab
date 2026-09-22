@@ -1,0 +1,11 @@
+---
+# Expects: wait_url, optionally wait_retries (default 12), wait_delay (default 10)
+- name: "Wait for {{ wait_url }}"
+  ansible.builtin.uri:
+    url: "{{ wait_url }}"
+    status_code: "{{ wait_status_codes | default([200, 301, 302, 401, 403]) }}"
+    validate_certs: false
+  register: wait_result
+  until: wait_result.status in (wait_status_codes | default([200, 301, 302, 401, 403]))
+  retries: "{{ wait_retries | default(12) }}"
+  delay: "{{ wait_delay | default(10) }}"

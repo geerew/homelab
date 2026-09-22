@@ -1,0 +1,15 @@
+---
+- name: Deploy homelab Docker Compose stack
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+
+  tasks:
+    - name: Deploy compose project
+      community.docker.docker_compose_v2:
+        project_src: "{{ homelab_dir }}"
+        env_files:
+          - "{{ env_file }}"
+        state: present

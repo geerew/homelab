@@ -1,0 +1,82 @@
+---
+- name: Promote Yamtrack user to Django admin
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Yamtrack admin username in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.YAMTRACK_ADMIN_USERNAME is defined
+          - homelab_env.YAMTRACK_ADMIN_USERNAME | length > 0
+        fail_msg: >-
+          Set YAMTRACK_ADMIN_USERNAME in {{ env_file }} (see .env.example).
+          The user must already exist (log in once via Authelia first).
+
+    - name: Ensure Yamtrack data directories exist
+      ansible.builtin.file:
+        path: "{{ data_dir }}/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - yamtrack/db
+        - yamtrack/redis
+
+    - name: Start Yamtrack and Redis
+      community.docker.docker_compose_v2:
+        project_src: "{{ homelab_dir }}"
+        env_files:
+          - "{{ env_file }}"
+        services:
+          - yamtrack-redis
+          - yamtrack
+        state: present
+
+    - name: Wait for Yamtrack container to be running
+      community.docker.docker_container_info:
+        name: yamtrack
+      register: yamtrack_container
+      until: yamtrack_container.exists and yamtrack_container.container.State.Running
+      retries: 12
+      delay: 10
+
+    - name: Check whether Yamtrack user exists
+      community.docker.docker_container_exec:
+        container: yamtrack
+        command: >-
+          python manage.py shell -c
+          "from users.models import User;
+          print(User.objects.filter(username='{{ homelab_env.YAMTRACK_ADMIN_USERNAME }}').exists())"
+      register: yamtrack_user_check
+      changed_when: false
+
+    - name: Fail when Yamtrack user does not exist
+      ansible.builtin.fail:
+        msg: >-
+          Yamtrack user '{{ homelab_env.YAMTRACK_ADMIN_USERNAME }}' not found.
+          Log in once at https://track.{{ homelab_env.DOMAIN }} via Authelia, then re-run this playbook.
+      when:
+        - not ansible_check_mode
+        - yamtrack_user_check.stdout | default('') | trim != 'True'
+
+    - name: Promote Yamtrack user to admin
+      community.docker.docker_container_exec:
+        container: yamtrack
+        command: >-
+          python manage.py shell -c
+          "from users.models import User;
+          User.objects.filter(username='{{ homelab_env.YAMTRACK_ADMIN_USERNAME }}').update(is_staff=True, is_superuser=True);
+          print('promoted')"
+      register: yamtrack_promote
+      changed_when: "'promoted' in (yamtrack_promote.stdout | default(''))"
+      when: not ansible_check_mode
+
+    - name: Report Yamtrack bootstrap status
+      ansible.builtin.debug:
+        msg: >-
+          Promoted '{{ homelab_env.YAMTRACK_ADMIN_USERNAME }}' to Yamtrack admin.
+          Open https://track.{{ homelab_env.DOMAIN }}/admin/

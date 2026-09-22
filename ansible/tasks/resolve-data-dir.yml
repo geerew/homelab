@@ -1,0 +1,9 @@
+---
+- name: Resolve DATA_DIR from .env
+  ansible.builtin.set_fact:
+    data_dir: >-
+      {{
+        homelab_dir
+        if (homelab_env.DATA_DIR | default('.')) in ['.', './']
+        else homelab_env.DATA_DIR
+      }}

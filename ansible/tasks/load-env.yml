@@ -1,0 +1,41 @@
+---
+- name: Resolve homelab directory
+  ansible.builtin.set_fact:
+    homelab_dir: "{{ lookup('env', 'HOMELAB_DIR') | default(playbook_dir + '/../..', true) }}"
+    env_file: "{{ lookup('env', 'HOMELAB_DIR') | default(playbook_dir + '/../..', true) }}/.env"
+
+- name: Check .env exists
+  ansible.builtin.stat:
+    path: "{{ env_file }}"
+  register: env_stat
+
+- name: Fail when .env is missing
+  ansible.builtin.fail:
+    msg: "Create {{ env_file }} from .env.example before running Ansible."
+  when: not env_stat.stat.exists
+
+- name: Load variables from .env
+  check_mode: false
+  ansible.builtin.shell: |
+    python3 <<PY
+    import json
+    import pathlib
+
+    env = {}
+    for line in pathlib.Path("{{ env_file }}").read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        env[key.strip()] = value
+    print(json.dumps(env))
+    PY
+  register: env_parsed
+  changed_when: false
+
+- name: Set homelab_env fact
+  ansible.builtin.set_fact:
+    homelab_env: "{{ env_parsed.stdout | from_json }}"

@@ -58,3 +58,15 @@ autokuma/*
 
 offcourse/*
 !offcourse/.keep
+
+dispatcharr/*
+!dispatcharr/.keep
+
+yamtrack/*
+!yamtrack/.keep
+
+mccleanengineering/*
+!mccleanengineering/.keep
+
+# Ansible – no secrets here; credentials live in .env only
+ansible/*.retry

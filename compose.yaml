@@ -240,7 +240,7 @@ services:
       - DOZZLE_AUTH_HEADER_USER=Remote-User
       - TZ=${TZ}
     labels:
-      # Watchtower
+      # Watchtower/home/mike/Documents/homelab/.env
       - com.centurylinklabs.watchtower.enable=true
       # Traefik
       - traefik.enable=true
@@ -254,6 +254,35 @@ services:
       - kuma.dozzle.docker.name=Dozzle
       - kuma.dozzle.docker.docker_container=dozzle
       - kuma.dozzle.docker.docker_host_name=socket_proxy_docker_host
+
+  mcclean:
+    image: mcclean:latest
+    container_name: mcclean
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    networks:
+      - traefik_network
+    environment:
+      - TZ=${TZ}
+      - MCCLEAN_ADMIN_USERNAME=${MCCLEAN_ADMIN_USERNAME}
+      - MCCLEAN_ADMIN_PASSWORD=${MCCLEAN_ADMIN_PASSWORD}
+    volumes:
+      - ${DATA_DIR}/mccleanengineering/data:/mcclean_data
+    entrypoint: ["/usr/local/bin/mcclean", "serve", "--data-dir", "/mcclean_data", "--http", "0.0.0.0:8080"]
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik (no authelia — app handles its own login)
+      - traefik.enable=true
+      - traefik.http.routers.mcclean.rule=Host(`demo.${DOMAIN}`)
+      - traefik.http.routers.mcclean.entrypoints=websecure
+      - traefik.http.routers.mcclean.tls=true
+      - traefik.http.routers.mcclean.tls.certresolver=cloudflare
+      - traefik.http.services.mcclean.loadbalancer.server.port=8080
+      # Kuma
+      - kuma.mcclean.http.name=McClean Engineering
+      - kuma.mcclean.http.url=http://mcclean:8080
+      - kuma.mcclean.http.interval=60
 
   homepage:
     image: ghcr.io/gethomepage/homepage:latest
@@ -296,6 +325,8 @@ services:
       - "991"
     networks:
       - traefik_network
+    ports:
+      - "8096:8096"
     environment:
       - TZ=${TZ}
     volumes:
@@ -321,6 +352,46 @@ services:
       - kuma.jellyfin.http.url=http://jellyfin:8096
       - kuma.jellyfin.http.interval=60
 
+  jellyscope:
+    image: jellyscope:latest
+    container_name: jellyscope
+    user: "${PUID}:${PGID}"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - traefik_network
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8097
+      - SECRET_KEY=${JELLYSCOPE_SECRET_KEY}
+      - JELLYFIN_URL=http://jellyfin:8096
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
+      - SECURE_COOKIES=1
+      - FORWARDED_ALLOW_IPS=192.168.90.0/24 
+      - TZ=${TZ}
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
+    volumes:
+      - ${DATA_DIR}/jellyscope/data:/app/data
+      - ${MEDIA1_DIR}:/media:ro
+      - ${MEDIA2_DIR}:/media2:ro
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.http.routers.jellyscope.rule=Host(`tv-stats.${DOMAIN}`)
+      - traefik.http.routers.jellyscope.entrypoints=websecure
+      - traefik.http.routers.jellyscope.tls=true
+      - traefik.http.routers.jellyscope.tls.certresolver=cloudflare
+      - traefik.http.routers.jellyscope.middlewares=authelia@docker
+      - traefik.http.services.jellyscope.loadbalancer.server.port=8097
+      # Kuma
+      - kuma.jellyscope.http.name=Jellyscope
+      - kuma.jellyscope.http.url=http://jellyscope:8097
+      - kuma.jellyscope.http.interval=60
+      
   audiobookshelf:
     image: advplyr/audiobookshelf:latest
     container_name: audiobookshelf
@@ -428,67 +499,197 @@ services:
       - kuma.wallos.http.url=http://wallos:80
       - kuma.wallos.http.interval=60
 
-  trilium:
-    image: triliumnext/trilium:latest
-    container_name: trilium
+  memos:
+    image: neosmemo/memos:stable
+    container_name: memos
+    user: "${PUID}:${PGID}" # <-- Add this line
     restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     networks:
       - traefik_network
     environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
       - TZ=${TZ}
-      - TRILIUM_DATA_DIR=/home/node/trilium-data
-      - TRILIUM_OAUTH_BASE_URL=https://notes.${DOMAIN}
-      - TRILIUM_OAUTH_CLIENT_ID=trilium
-      - TRILIUM_OAUTH_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
-      - TRILIUM_OAUTH_ISSUER_BASE_URL=https://auth.${DOMAIN}
-      - TRILIUM_OAUTH_ISSUER_NAME=Authelia
     volumes:
-      - ${DATA_DIR}/trilium/data:/home/node/trilium-data
+      - ${DATA_DIR}/memos:/var/opt/memos
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
       # Traefik
       - traefik.enable=true
-      - traefik.http.routers.trilium.rule=Host(`notes.${DOMAIN}`)
-      - traefik.http.routers.trilium.entrypoints=websecure
-      - traefik.http.routers.trilium.tls=true
-      - traefik.http.routers.trilium.tls.certresolver=cloudflare
+      - traefik.http.routers.memos.rule=Host(`notes.${DOMAIN}`)
+      - traefik.http.routers.memos.entrypoints=websecure
+      - traefik.http.routers.memos.tls=true
+      - traefik.http.routers.memos.tls.certresolver=cloudflare
+      - traefik.http.services.memos.loadbalancer.server.port=5230
       # Kuma
-      - kuma.trilium.http.name=Trilium
-      - kuma.trilium.http.url=http://trilium:8080
-      - kuma.trilium.http.interval=60
+      - kuma.memos.http.name=Memos
+      - kuma.memos.http.url=http://memos:5230
+      - kuma.memos.http.interval=60
 
-  jellyseerr:
-    image: fallenbagel/jellyseerr:latest
-    container_name: jellyseerr
+  sparkyfitness-db:
+    image: postgres:18.3-alpine
+    container_name: sparkyfitness-db
+    restart: unless-stopped
+    networks:
+      - traefik_network
+    environment:
+      - POSTGRES_DB=sparky_fitness
+      - POSTGRES_USER=sparky
+      - POSTGRES_PASSWORD=${SPARKY_FITNESS_DB_PASSWORD}
+      - PUID=${PUID}
+      - PGID=${PGID}
+    volumes:
+      - ${DATA_DIR}/sparkyfitness/db:/var/lib/postgresql
+
+
+  sparkyfitness-server:
+    image: codewithcj/sparkyfitness_server:latest
+    container_name: sparkyfitness-server
+    restart: unless-stopped
+    depends_on:
+      - sparkyfitness-db
+    networks:
+      - traefik_network
+    environment:
+      - TZ=${TZ}
+      - ALLOW_PRIVATE_NETWORK_CORS=true
+      - SPARKY_FITNESS_EXTRA_TRUSTED_ORIGINS=https://fitness.${DOMAIN}
+      - SPARKY_FITNESS_DB_HOST=sparkyfitness-db
+      - SPARKY_FITNESS_DB_PORT=5432
+      - SPARKY_FITNESS_DB_NAME=sparky_fitness
+      - SPARKY_FITNESS_DB_USER=sparky
+      - SPARKY_FITNESS_DB_PASSWORD=${SPARKY_FITNESS_DB_PASSWORD}
+      - SPARKY_FITNESS_APP_DB_USER=sparky_app
+      - SPARKY_FITNESS_APP_DB_PASSWORD=${SPARKY_FITNESS_APP_DB_PASSWORD}
+      - SPARKY_FITNESS_FRONTEND_URL=https://fitness.${DOMAIN}
+      - SPARKY_FITNESS_DISABLE_SIGNUP=true
+      - SPARKY_FITNESS_API_ENCRYPTION_KEY=${SPARKY_FITNESS_ENCRYPTION_KEY}
+      - BETTER_AUTH_SECRET=${SPARKY_FITNESS_BETTER_AUTH}
+      - JWT_SECRET=${SPARKY_FITNESS_JWT_SECRET}
+      # --- Native Authelia OIDC Config ---
+      - SPARKY_FITNESS_OIDC_AUTH_ENABLED=true
+      - SPARKY_FITNESS_OIDC_PROVIDER_SLUG=authelia
+      - SPARKY_FITNESS_OIDC_PROVIDER_NAME=Authelia
+      - SPARKY_FITNESS_OIDC_ISSUER_URL=https://auth.${DOMAIN}
+      - SPARKY_FITNESS_OIDC_CLIENT_ID=sparkyfitness
+      - SPARKY_FITNESS_OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}
+      - SPARKY_FITNESS_OIDC_SCOPE=openid email profile groups
+      - SPARKY_FITNESS_OIDC_AUTO_REGISTER=true
+      - PUID=${PUID}
+      - PGID=${PGID}
+    volumes:
+      - ${DATA_DIR}/sparkyfitness/backup:/app/SparkyFitnessServer/backup
+      - ${DATA_DIR}/sparkyfitness/uploads:/app/SparkyFitnessServer/uploads
+
+  sparkyfitness-frontend:
+    image: codewithcj/sparkyfitness:latest
+    container_name: sparkyfitness-frontend
+    restart: unless-stopped
+    depends_on:
+      - sparkyfitness-server
+    networks:
+      - traefik_network
+    environment:
+      - SPARKY_FITNESS_FRONTEND_URL=https://fitness.${DOMAIN}
+      - SPARKY_FITNESS_SERVER_HOST=sparkyfitness-server
+      - SPARKY_FITNESS_SERVER_PORT=3010
+      - PUID=${PUID}
+      - PGID=${PGID}
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik (Directing entry points straight to Nginx on port 80 inside the container)
+      - traefik.enable=true
+      - traefik.http.routers.sparky.rule=Host(`fitness.${DOMAIN}`)
+      - traefik.http.routers.sparky.entrypoints=websecure
+      - traefik.http.routers.sparky.tls=true
+      - traefik.http.routers.sparky.tls.certresolver=cloudflare
+      - traefik.http.services.sparky.loadbalancer.server.port=80
+      # Kuma
+      - kuma.sparky.http.name=SparkyFitness
+      - kuma.sparky.http.url=http://sparkyfitness-frontend:80
+      - kuma.sparky.http.interval=60
+
+  seerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    container_name: seerr
+    init: true
     restart: unless-stopped
     environment:
       - LOG_LEVEL=info
       - TZ=${TZ}
-      - PUID=${PUID}
-      - PGID=${PGID}
     networks:
       - traefik_network
     volumes:
-      - ${DATA_DIR}/jellyseerr/config:/app/config
+      - ${DATA_DIR}/seerr/config:/app/config
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+      retries: 3
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
       # Traefik
       - traefik.enable=true
-      - traefik.http.routers.jellyseerr.rule=Host(`jellyseerr.${DOMAIN}`)
-      - traefik.http.routers.jellyseerr.entrypoints=websecure
-      - traefik.http.routers.jellyseerr.tls=true
-      - traefik.http.routers.jellyseerr.tls.certresolver=cloudflare
-      - traefik.http.routers.jellyseerr.middlewares=authelia@docker
+      - traefik.http.routers.seerr.rule=Host(`seerr.${DOMAIN}`)
+      - traefik.http.routers.seerr.entrypoints=websecure
+      - traefik.http.routers.seerr.tls=true
+      - traefik.http.routers.seerr.tls.certresolver=cloudflare
+      # - traefik.http.routers.seerr.middlewares=authelia@docker
+      - traefik.http.services.seerr.loadbalancer.server.port=5055
       # Kuma
-      - kuma.jellyseerr.http.name=Jellyseerr
-      - kuma.jellyseerr.http.url=http://jellyseerr:5055
-      - kuma.jellyseerr.http.interval=60
+      - kuma.seerr.http.name=Seerr
+      - kuma.seerr.http.url=http://seerr:5055
+      - kuma.seerr.http.interval=60
+
+  yamtrack-redis:
+    image: redis:8-alpine
+    container_name: yamtrack-redis
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    networks:
+      - traefik_network
+    volumes:
+      - ${DATA_DIR}/yamtrack/redis:/data
+
+  yamtrack:
+    image: ghcr.io/fuzzygrim/yamtrack:latest
+    container_name: yamtrack
+    restart: unless-stopped
+    depends_on:
+      - yamtrack-redis
+    networks:
+      - traefik_network
+    environment:
+      - TZ=${TZ}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - SECRET=${YAMTRACK_SECRET}
+      - REDIS_URL=redis://yamtrack-redis:6379
+      - URLS=https://track.${DOMAIN}
+      - ADMIN_ENABLED=True
+      - SOCIALACCOUNT_ONLY=True
+      - REDIRECT_LOGIN_TO_SSO=True
+      - ACCOUNT_DEFAULT_HTTP_PROTOCOL=https
+      - SOCIAL_PROVIDERS=allauth.socialaccount.providers.openid_connect
+      - "SOCIALACCOUNT_PROVIDERS={\"openid_connect\":{\"OAUTH_PKCE_ENABLED\":true,\"APPS\":[{\"provider_id\":\"authelia\",\"name\":\"Authelia\",\"client_id\":\"yamtrack\",\"secret\":\"${OIDC_CLIENT_SECRET}\",\"settings\":{\"server_url\":\"https://auth.${DOMAIN}/.well-known/openid-configuration\"}}]}}"
+    volumes:
+      - ${DATA_DIR}/yamtrack/db:/yamtrack/db
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Traefik (Authelia OIDC login — no forward-auth middleware)
+      - traefik.enable=true
+      - traefik.http.routers.yamtrack.rule=Host(`track.${DOMAIN}`)
+      - traefik.http.routers.yamtrack.entrypoints=websecure
+      - traefik.http.routers.yamtrack.tls=true
+      - traefik.http.routers.yamtrack.tls.certresolver=cloudflare
+      - traefik.http.services.yamtrack.loadbalancer.server.port=8000
+      # Kuma
+      - kuma.yamtrack.http.name=Yamtrack
+      - kuma.yamtrack.http.url=http://yamtrack:8000
+      - kuma.yamtrack.http.interval=60
 
   gluetun:
     image: qmcgaw/gluetun:latest
@@ -505,6 +706,7 @@ services:
       - SERVER_CITIES=Gothenburg,Malmö,Stockholm
       - DOT=off
       - DNS_ADDRESS=10.64.0.1
+      - HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE={"auth":"apikey","apikey":"${GLUETUN_API_KEY}"}
       - HTTP_CONTROL_SERVER_ADDRESS=:8000
       - HTTP_CONTROL_SERVER_LOG=on
       - HTTPPROXY=on
@@ -516,6 +718,7 @@ services:
       - 7878:7878/tcp
       - 9696:9696/tcp
       - 9865:9865/tcp
+      - 9191:9191/tcp
     networks:
       - traefik_network
     restart: unless-stopped
@@ -567,6 +770,13 @@ services:
       - traefik.http.routers.bazarr.middlewares=authelia@docker
       - traefik.http.routers.bazarr.service=bazarr-service
       - traefik.http.services.bazarr-service.loadbalancer.server.port=6767
+      - traefik.http.routers.dispatcharr.rule=Host(`dispatch.${DOMAIN}`)
+      - traefik.http.routers.dispatcharr.entrypoints=websecure
+      - traefik.http.routers.dispatcharr.tls=true
+      - traefik.http.routers.dispatcharr.tls.certresolver=cloudflare
+      - traefik.http.routers.dispatcharr.middlewares=authelia@docker
+      - traefik.http.routers.dispatcharr.service=dispatcharr-service
+      - traefik.http.services.dispatcharr-service.loadbalancer.server.port=9191
       # Kuma
       - kuma.vpn.port.name=VPN Gateway
       - kuma.vpn.port.hostname=gluetun
@@ -679,6 +889,37 @@ services:
       # Kuma
       - kuma.bazarr.http.name=Bazarr
       - kuma.bazarr.http.url=${KUMA_BAZARR_URL:-http://gluetun:6767/api/system/status}
+
+  dispatcharr:
+    image: ghcr.io/dispatcharr/dispatcharr:latest
+    container_name: dispatcharr
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+    depends_on:
+      - gluetun
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      - DISPATCHARR_ENV=aio
+      - REDIS_HOST=localhost
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - DISPATCHARR_LOG_LEVEL=info
+      # Behind Traefik + Gluetun: ignore X-Forwarded-For so login works via
+      # dispatch.${DOMAIN} (client appears as Traefik on 192.168.90.0/24).
+      - DISPATCHARR_TRUSTED_PROXIES=${DISPATCHARR_TRUSTED_PROXIES:-none}
+      # Block web signup — admin is created by ansible/playbooks/bootstrap-dispatcharr.yml
+      - DISPATCHARR_SETUP_ALLOWED_IP=${DISPATCHARR_SETUP_ALLOWED_IP:-127.0.0.1}
+    volumes:
+      - ${DATA_DIR}/dispatcharr/data:/data
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    labels:
+      # Watchtower
+      - com.centurylinklabs.watchtower.enable=true
+      # Kuma
+      - kuma.dispatcharr.http.name=Dispatcharr
+      - kuma.dispatcharr.http.url=${KUMA_DISPATCHARR_URL:-http://gluetun:9191}
 
 networks:
   default:
