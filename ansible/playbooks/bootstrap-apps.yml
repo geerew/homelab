@@ -1,6 +1,0 @@
----
-- name: Bootstrap homelab application accounts
-  ansible.builtin.import_playbook: bootstrap-dispatcharr.yml
-
-- name: Bootstrap Yamtrack admin
-  ansible.builtin.import_playbook: bootstrap-yamtrack.yml

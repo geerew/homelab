@@ -22,10 +22,12 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 
 | Playbook | Purpose |
 | --- | --- |
-| `playbooks/site.yml` | Deploy the full Docker Compose stack |
-| `playbooks/bootstrap-dispatcharr.yml` | Create Dispatcharr superuser (idempotent) |
-| `playbooks/bootstrap-yamtrack.yml` | Promote an existing Yamtrack user to admin |
-| `playbooks/bootstrap-apps.yml` | Run both bootstrap playbooks |
+| `playbooks/site.yml` | Ensure `services/` dirs + deploy the full Docker Compose stack |
+| `playbooks/ensure-service-dirs.yml` | Create `services/` directory tree only (no Compose) |
+| `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + EPL/sports channels (idempotent) |
+| `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
+| `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
+| `playbooks/deploy-services.yml` | Dispatcharr + Gluetun + Homepage |
 
 ## Usage
 
@@ -35,15 +37,65 @@ From the `ansible/` directory:
 # Deploy everything
 ansible-playbook playbooks/site.yml
 
-# Create Dispatcharr admin (reads credentials from .env)
-ansible-playbook playbooks/bootstrap-dispatcharr.yml
+# Deploy Dispatcharr (admin + M3U provider + EPL/sports channels)
+ansible-playbook playbooks/deploy-dispatcharr.yml
 
-# Promote Yamtrack user to admin (user must exist — log in via Authelia first)
-ansible-playbook playbooks/bootstrap-yamtrack.yml
+# Deploy Gluetun auth config (API key from .env)
+ansible-playbook playbooks/deploy-gluetun.yml
 
-# Both bootstraps
-ansible-playbook playbooks/bootstrap-apps.yml
+# Deploy Homepage config (widget creds/keys from .env)
+ansible-playbook playbooks/deploy-homepage.yml
+
+# Deploy all app services (Dispatcharr + Gluetun + Homepage)
+ansible-playbook playbooks/deploy-services.yml
 ```
+
+### Homepage configuration
+
+All Homepage YAML lives in Ansible and deploys to `services/homepage/config/` (gitignored):
+
+| File | Source |
+| --- | --- |
+| `services.yaml` | [`templates/homepage/services.yaml.j2`](templates/homepage/services.yaml.j2) |
+| `bookmarks.yaml`, `settings.yaml`, `widgets.yaml`, `docker.yaml`, `proxmox.yaml`, `kubernetes.yaml` | [`files/homepage/`](files/homepage/) |
+
+Edit the Ansible sources, then run `deploy-homepage.yml`. Do not edit files under `services/homepage/config/` directly — changes will be overwritten.
+
+Widget secrets are read from `.env` only (nothing sensitive is committed in Ansible):
+
+| Service | `.env` variable |
+| --- | --- |
+| Jellyfin | `HOMEPAGE_JELLYFIN_API_KEY` |
+| Audiobookshelf | `HOMEPAGE_AUDIOBOOKSHELF_API_KEY` |
+| Mealie | `HOMEPAGE_MEALIE_API_KEY` |
+| Wallos | `HOMEPAGE_WALLOS_API_KEY` |
+| Sonarr, Radarr, Prowlarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
+| Seerr | `HOMEPAGE_SEERR_API_KEY` |
+| Traefik dashboard | `HOMEPAGE_TRAEFIK_USERNAME`, `HOMEPAGE_TRAEFIK_PASSWORD` |
+| Dispatcharr | `DISPATCHARR_ADMIN_*` |
+| Gluetun | `GLUETUN_API_KEY` |
+
+Gluetun `config.toml` is generated to `services/gluetun/config.toml` (gitignored) and bind-mounted into the container at `/gluetun/auth/config.toml`.
+
+### Migrating data to `services/`
+
+Compose and Ansible now expect data under `services/`. **Do not restart the stack until existing data is moved**, or containers will mount empty directories.
+
+1. Stop the stack: `docker compose down` (from repo root).
+2. Create the target tree (optional — Ansible can do this): `ansible-playbook playbooks/ensure-service-dirs.yml`
+3. Move each top-level service dir into `services/` (only move dirs that exist):
+
+   ```bash
+   cd "${DATA_DIR:-.}"   # repo root if DATA_DIR=./
+   mkdir -p services
+   for d in traefik authelia uptime-kuma autokuma homepage jellyfin jellyscope \
+     audiobookshelf mealie wallos memos sparkyfitness seerr gluetun \
+     qbittorrent sonarr radarr prowlarr bazarr dispatcharr mccleanengineering trilium; do
+     [ -d "$d" ] && mv "$d" services/
+   done
+   ```
+
+4. Bring the stack back: `ansible-playbook playbooks/site.yml` then `ansible-playbook playbooks/deploy-services.yml` if needed.
 
 ### Dry run (`--check`)
 
@@ -54,48 +106,60 @@ ansible-playbook playbooks/site.yml --check
 ansible-playbook playbooks/site.yml --check --diff   # show config diffs where supported
 ```
 
-Bootstrap playbooks (`bootstrap-*.yml`) are not fully simulatable in check mode — Docker exec steps are skipped. Use `--check` on `site.yml` only; run bootstraps for real when testing admin setup.
+Deploy playbooks (`deploy-*.yml`) are not fully simulatable in check mode — Docker exec steps are skipped. Use `--check` on `site.yml` only; run deploy playbooks for real when testing app setup.
 
 ### Reset app data for bootstrap testing
 
-Stop the services, wipe their data dirs (keeps `.keep`), then re-run the playbooks:
+Stop the services, wipe their data dirs, then re-run the playbooks:
 
 ```bash
 cd ..   # repo root
-docker compose stop yamtrack yamtrack-redis dispatcharr
-rm -rf yamtrack/db/* yamtrack/redis/*
-rm -rf dispatcharr/data/*
+docker compose stop dispatcharr
+rm -rf services/dispatcharr/data/*
 # Do not use `docker compose run dispatcharr ...` for cleanup — it runs as root and creates root-owned files.
 
 cd ansible
-ansible-playbook playbooks/bootstrap-dispatcharr.yml
-# Log in to Yamtrack via Authelia once, then:
-ansible-playbook playbooks/bootstrap-yamtrack.yml
+ansible-playbook playbooks/deploy-dispatcharr.yml
 ```
 
 ## Required `.env` variables
 
-### Dispatcharr bootstrap
+### Dispatcharr
+
+`deploy-dispatcharr.yml` reads all of these from `.env`:
 
 ```env
 DISPATCHARR_ADMIN_USERNAME=mike
 DISPATCHARR_ADMIN_PASSWORD=your-secure-password
 DISPATCHARR_ADMIN_EMAIL=mike@example.com
+DISPATCHARR_M3U_NAME=Strong8k
+DISPATCHARR_M3U_URL=http://cf.strong8high.xyz
+DISPATCHARR_M3U_USERNAME=your-provider-username
+DISPATCHARR_M3U_PASSWORD=your-provider-password
+DISPATCHARR_M3U_ACCOUNT_TYPE=XC
 ```
 
-### Yamtrack admin promotion
+Use `XC` for Xtream Codes (base URL + username/password). Use `STD` for a direct M3U playlist URL. The playbook skips creation if an account with the same name already exists.
 
-```env
-YAMTRACK_ADMIN_USERNAME=mike
-```
+XC accounts have a two-step setup: create discovers channel groups (`pending_setup`), then a full refresh imports streams. The playbook handles both steps automatically and waits for `success`. Re-run it if an account is stuck on `pending_setup`.
 
-Log in to Yamtrack via Authelia once before running the Yamtrack playbook so the user record exists.
+EPL/sports channel groups are defined in [`vars/dispatcharr_epl_channel_groups.yml`](vars/dispatcharr_epl_channel_groups.yml):
+
+- EPL Premier League PPV (+ VIP) and Premier League+
+- TNT Sport HD and NOW TV Sport (Sky)
+
+Channels are numbered from 100, 200, 300, etc. Test playback via **Channels** in the UI, VLC with `https://dispatch.${DOMAIN}/output/m3u/`, or Jellyfin Live TV (`http://dispatcharr:9191/hdhr`).
+
+Dispatcharr runs **outside** Gluetun so IPTV provider traffic uses your home IP (many providers block VPN/datacenter exits). *arr apps stay on the VPN.
+
+### Jellyfin Live TV
+
+Add an **HDHomeRun** tuner at `http://dispatcharr:9191/hdhr` (not `gluetun:9191`). If Dispatcharr was moved off the VPN, update the tuner URL in **Dashboard → Live TV** and refresh channels — Jellyfin caches stream URLs and will fail with `Connection refused (gluetun:9191)` until re-scanned.
 
 ## Notes
 
 - Playbooks use `community.docker.docker_compose_v2` and pass your `.env` file to Compose.
-- Dispatcharr bootstrap waits on `http://127.0.0.1:9191` (published on Gluetun).
-- Web signup is disabled (`DISPATCHARR_SETUP_ALLOWED_IP=127.0.0.1`). Run `bootstrap-dispatcharr.yml` after `site.yml` to create the admin.
+- Dispatcharr bootstrap waits on `http://127.0.0.1:9191` (published on the dispatcharr container).
+- Web signup is disabled (`DISPATCHARR_SETUP_ALLOWED_IP=127.0.0.1`). Run `deploy-dispatcharr.yml` after `site.yml`.
 - Starting Gluetun always includes all `network_mode: service:gluetun` sidecars (Sonarr, Radarr, etc.) so a Gluetun recreate cannot orphan them.
-- Yamtrack bootstrap waits for the container to be running, then promotes the user via Django shell.
 - Tasks that handle passwords use `no_log: true` so secrets are not printed in Ansible output.

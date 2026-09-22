@@ -1,0 +1,287 @@
+---
+- name: Deploy Dispatcharr
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../vars/dispatcharr_epl_channel_groups.yml
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Dispatcharr admin variables in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DISPATCHARR_ADMIN_USERNAME is defined
+          - homelab_env.DISPATCHARR_ADMIN_USERNAME | length > 0
+          - homelab_env.DISPATCHARR_ADMIN_PASSWORD is defined
+          - homelab_env.DISPATCHARR_ADMIN_PASSWORD | length > 0
+          - homelab_env.DISPATCHARR_ADMIN_EMAIL is defined
+          - homelab_env.DISPATCHARR_ADMIN_EMAIL | length > 0
+        fail_msg: >-
+          Set DISPATCHARR_ADMIN_USERNAME, DISPATCHARR_ADMIN_PASSWORD, and
+          DISPATCHARR_ADMIN_EMAIL in {{ env_file }} (see .env.example).
+
+    - name: Validate Dispatcharr M3U variables in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DISPATCHARR_M3U_NAME is defined
+          - homelab_env.DISPATCHARR_M3U_NAME | length > 0
+          - homelab_env.DISPATCHARR_M3U_URL is defined
+          - homelab_env.DISPATCHARR_M3U_URL | length > 0
+          - homelab_env.DISPATCHARR_M3U_USERNAME is defined
+          - homelab_env.DISPATCHARR_M3U_USERNAME | length > 0
+        fail_msg: >-
+          Set DISPATCHARR_M3U_NAME, DISPATCHARR_M3U_URL, and DISPATCHARR_M3U_USERNAME
+          in {{ env_file }} (see .env.example).
+
+    - name: Validate Dispatcharr M3U password in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DISPATCHARR_M3U_PASSWORD is defined
+          - homelab_env.DISPATCHARR_M3U_PASSWORD | length > 0
+        fail_msg: >-
+          Set DISPATCHARR_M3U_PASSWORD in {{ env_file }} before running this playbook.
+      when: not ansible_check_mode
+
+    - name: Ensure Dispatcharr data directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/dispatcharr/data"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Fix Dispatcharr uploads directory ownership
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/dispatcharr/data/uploads"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Start Gluetun VPN stack
+      ansible.builtin.import_tasks: ../tasks/start-gluetun-stack.yml
+
+    - name: Fix Dispatcharr data paths created before PUID/PGID was set
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "{{ item.endswith('jwt') | ternary('0600', '0755') }}"
+      loop:
+        - "{{ data_dir }}/services/dispatcharr/data/uploads"
+        - "{{ data_dir }}/services/dispatcharr/data/jwt"
+      failed_when: false
+
+    - name: Wait for Dispatcharr web UI
+      ansible.builtin.import_tasks: ../tasks/wait-for-http.yml
+      vars:
+        wait_url: "http://127.0.0.1:9191"
+
+    - name: Check whether Dispatcharr admin already exists
+      community.docker.docker_container_exec:
+        container: dispatcharr
+        command: >-
+          python manage.py shell -c
+          "from django.contrib.auth import get_user_model;
+          print(get_user_model().objects.filter(username='{{ homelab_env.DISPATCHARR_ADMIN_USERNAME }}').exists())"
+      register: dispatcharr_user_check
+      changed_when: false
+
+    - name: Parse Dispatcharr admin existence check
+      ansible.builtin.set_fact:
+        dispatcharr_user_exists: "{{ 'True' in (dispatcharr_user_check.stdout_lines | default([])) }}"
+
+    - name: Create Dispatcharr superuser
+      community.docker.docker_container_exec:
+        container: dispatcharr
+        env:
+          DJANGO_SUPERUSER_PASSWORD: "{{ homelab_env.DISPATCHARR_ADMIN_PASSWORD }}"
+        command: >-
+          python manage.py shell -c
+          "import os; from django.contrib.auth import get_user_model;
+          User=get_user_model();
+          User.objects.create_superuser(
+          '{{ homelab_env.DISPATCHARR_ADMIN_USERNAME }}',
+          '{{ homelab_env.DISPATCHARR_ADMIN_EMAIL }}',
+          os.environ['DJANGO_SUPERUSER_PASSWORD'])"
+      when:
+        - not ansible_check_mode
+        - not dispatcharr_user_exists
+      no_log: true
+
+    - name: Obtain Dispatcharr API token
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9191/api/accounts/token/
+        method: POST
+        body_format: json
+        body:
+          username: "{{ homelab_env.DISPATCHARR_ADMIN_USERNAME }}"
+          password: "{{ homelab_env.DISPATCHARR_ADMIN_PASSWORD }}"
+        status_code: 200
+      register: dispatcharr_token
+      no_log: true
+      when: not ansible_check_mode
+
+    - name: List Dispatcharr M3U accounts
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9191/api/m3u/accounts/
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        status_code: 200
+      register: dispatcharr_m3u_list
+      when: not ansible_check_mode
+
+    - name: Resolve existing M3U account by name
+      ansible.builtin.set_fact:
+        dispatcharr_m3u_existing: >-
+          {{
+            dispatcharr_m3u_list.json
+            | selectattr('name', 'equalto', homelab_env.DISPATCHARR_M3U_NAME)
+            | list
+            | first
+            | default(none, true)
+          }}
+      when: not ansible_check_mode
+
+    - name: Create Dispatcharr M3U account
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9191/api/m3u/accounts/
+        method: POST
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        body_format: json
+        body:
+          name: "{{ homelab_env.DISPATCHARR_M3U_NAME }}"
+          server_url: "{{ homelab_env.DISPATCHARR_M3U_URL }}"
+          username: "{{ homelab_env.DISPATCHARR_M3U_USERNAME }}"
+          password: "{{ homelab_env.DISPATCHARR_M3U_PASSWORD }}"
+          is_active: true
+          account_type: "{{ homelab_env.DISPATCHARR_M3U_ACCOUNT_TYPE | default('XC') }}"
+        status_code: 201
+      register: dispatcharr_m3u_create
+      no_log: true
+      when:
+        - not ansible_check_mode
+        - dispatcharr_m3u_existing is none
+
+    - name: Resolve Dispatcharr M3U account id
+      ansible.builtin.set_fact:
+        dispatcharr_m3u_account_id: >-
+          {{
+            dispatcharr_m3u_create.json.id
+            if (dispatcharr_m3u_create is defined and dispatcharr_m3u_create is changed)
+            else dispatcharr_m3u_existing.id
+          }}
+      when: not ansible_check_mode
+
+    - name: Wait for XC group discovery after account creation
+      ansible.builtin.pause:
+        seconds: 15
+      when:
+        - not ansible_check_mode
+        - dispatcharr_m3u_create is changed
+        - (homelab_env.DISPATCHARR_M3U_ACCOUNT_TYPE | default('XC')) == 'XC'
+
+    - name: Fetch Dispatcharr M3U account status
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9191/api/m3u/accounts/{{ dispatcharr_m3u_account_id }}/"
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        status_code: 200
+      register: dispatcharr_m3u_status
+      when: not ansible_check_mode
+
+    - name: Trigger full Dispatcharr M3U refresh
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9191/api/m3u/refresh/{{ dispatcharr_m3u_account_id }}/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        status_code: [200, 202]
+      register: dispatcharr_m3u_refresh
+      when:
+        - not ansible_check_mode
+        - dispatcharr_m3u_status.json.status != 'success'
+
+    - name: Wait for Dispatcharr M3U refresh to finish
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9191/api/m3u/accounts/{{ dispatcharr_m3u_account_id }}/"
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        status_code: 200
+      register: dispatcharr_m3u_poll
+      until: dispatcharr_m3u_poll.json.status in ['success', 'error']
+      retries: 40
+      delay: 15
+      when:
+        - not ansible_check_mode
+        - dispatcharr_m3u_refresh is changed
+
+    - name: Fail when Dispatcharr M3U refresh errored
+      ansible.builtin.fail:
+        msg: >-
+          M3U refresh failed for '{{ homelab_env.DISPATCHARR_M3U_NAME }}':
+          {{ dispatcharr_m3u_poll.json.last_message | default('unknown error') }}
+      when:
+        - not ansible_check_mode
+        - dispatcharr_m3u_poll is not skipped
+        - dispatcharr_m3u_poll.json.status == 'error'
+
+    - name: Enable auto channel sync for EPL/sports groups
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9191/api/m3u/accounts/{{ dispatcharr_m3u_account_id }}/group-settings/"
+        method: PATCH
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        body_format: json
+        body:
+          group_settings: "{{ dispatcharr_epl_group_settings }}"
+        status_code: 200
+      vars:
+        dispatcharr_epl_group_settings: "{{ lookup('ansible.builtin.template', '../templates/dispatcharr/epl_group_settings.json.j2') | from_json }}"
+      register: dispatcharr_group_settings
+      when: not ansible_check_mode
+
+    - name: Run Dispatcharr auto channel sync
+      community.docker.docker_container_exec:
+        container: dispatcharr
+        command: >-
+          python manage.py shell -c
+          "from apps.m3u.tasks import sync_auto_channels;
+          from apps.m3u.models import M3UAccount;
+          from apps.channels.models import Channel;
+          from django.utils import timezone;
+          from datetime import timedelta;
+          account=M3UAccount.objects.get(name='{{ homelab_env.DISPATCHARR_M3U_NAME }}');
+          result=sync_auto_channels(
+          account.id,
+          scan_start_time=str(timezone.now()-timedelta(hours=24)));
+          print({'channels': Channel.objects.count(), 'sync': result})"
+      register: dispatcharr_channel_sync
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Parse auto channel sync result
+      ansible.builtin.set_fact:
+        dispatcharr_channel_sync_result: "{{ dispatcharr_channel_sync.stdout_lines | last | default('{}') }}"
+      when:
+        - not ansible_check_mode
+        - dispatcharr_channel_sync is not skipped
+
+    - name: Report Dispatcharr configure status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to bootstrap admin, configure M3U account
+          '{{ homelab_env.DISPATCHARR_M3U_NAME }}', and sync {{ dispatcharr_epl_channel_groups | length }} EPL/sports channel groups.
+          {% else %}
+          Dispatcharr ready for '{{ homelab_env.DISPATCHARR_M3U_NAME }}'.
+          Admin: {{ 'already existed' if dispatcharr_user_exists else 'created' }} ('{{ homelab_env.DISPATCHARR_ADMIN_USERNAME }}').
+          M3U: {% if dispatcharr_m3u_refresh is skipped %}already complete{% elif dispatcharr_m3u_poll is not skipped %}refreshed ({{ dispatcharr_m3u_poll.json.status }}){% else %}account configured{% endif %}.
+          Channels: {{ dispatcharr_channel_sync_result | default('sync skipped') }}.
+          UI: https://dispatch.{{ homelab_env.DOMAIN }}/ — Jellyfin HDHR: http://dispatcharr:9191/hdhr
+          {% endif %}

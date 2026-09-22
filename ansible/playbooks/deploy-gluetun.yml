@@ -1,0 +1,51 @@
+---
+- name: Deploy Gluetun
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Gluetun API key in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.GLUETUN_API_KEY is defined
+          - homelab_env.GLUETUN_API_KEY | length > 0
+        fail_msg: >-
+          Set GLUETUN_API_KEY in {{ env_file }}.
+          Generate with: docker run --rm qmcgaw/gluetun genkey
+
+    - name: Ensure Gluetun config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/gluetun"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Render config.toml from template
+      ansible.builtin.template:
+        src: ../templates/gluetun/config.toml.j2
+        dest: "{{ data_dir }}/services/gluetun/config.toml"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      register: gluetun_config
+      no_log: true
+
+    - name: Start Gluetun VPN stack
+      ansible.builtin.import_tasks: ../tasks/start-gluetun-stack.yml
+      when: gluetun_config.changed and not ansible_check_mode
+
+    - name: Report Gluetun deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to render Gluetun config.toml.
+          {% elif gluetun_config.changed %}
+          Rendered {{ data_dir }}/services/gluetun/config.toml and restarted Gluetun stack.
+          {% else %}
+          Gluetun config.toml unchanged — no restart needed.
+          {% endif %}

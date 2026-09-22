@@ -672,7 +672,6 @@ services:
       - 7878:7878/tcp
       - 9696:9696/tcp
       - 9865:9865/tcp
-      - 9191:9191/tcp
     networks:
       - traefik_network
     restart: unless-stopped
@@ -724,13 +723,6 @@ services:
       - traefik.http.routers.bazarr.middlewares=authelia@docker
       - traefik.http.routers.bazarr.service=bazarr-service
       - traefik.http.services.bazarr-service.loadbalancer.server.port=6767
-      - traefik.http.routers.dispatcharr.rule=Host(`dispatch.${DOMAIN}`)
-      - traefik.http.routers.dispatcharr.entrypoints=websecure
-      - traefik.http.routers.dispatcharr.tls=true
-      - traefik.http.routers.dispatcharr.tls.certresolver=cloudflare
-      - traefik.http.routers.dispatcharr.middlewares=authelia@docker
-      - traefik.http.routers.dispatcharr.service=dispatcharr-service
-      - traefik.http.services.dispatcharr-service.loadbalancer.server.port=9191
       # Kuma
       - kuma.vpn.port.name=VPN Gateway
       - kuma.vpn.port.hostname=gluetun
@@ -847,10 +839,11 @@ services:
   dispatcharr:
     image: ghcr.io/dispatcharr/dispatcharr:latest
     container_name: dispatcharr
-    network_mode: "service:gluetun"
     restart: unless-stopped
-    depends_on:
-      - gluetun
+    networks:
+      - traefik_network
+    ports:
+      - 9191:9191/tcp
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -859,10 +852,9 @@ services:
       - REDIS_HOST=localhost
       - CELERY_BROKER_URL=redis://localhost:6379/0
       - DISPATCHARR_LOG_LEVEL=info
-      # Behind Traefik + Gluetun: ignore X-Forwarded-For so login works via
-      # dispatch.${DOMAIN} (client appears as Traefik on 192.168.90.0/24).
+      # Behind Traefik: ignore X-Forwarded-For so login works via dispatch.${DOMAIN}.
       - DISPATCHARR_TRUSTED_PROXIES=${DISPATCHARR_TRUSTED_PROXIES:-none}
-      # Block web signup — admin is created by ansible/playbooks/bootstrap-dispatcharr.yml
+      # Block web signup — admin is created by ansible/playbooks/deploy-dispatcharr.yml
       - DISPATCHARR_SETUP_ALLOWED_IP=${DISPATCHARR_SETUP_ALLOWED_IP:-127.0.0.1}
     volumes:
       - ${DATA_DIR}/services/dispatcharr/data:/data
@@ -871,9 +863,19 @@ services:
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
+      # Traefik
+      - traefik.enable=true
+      - traefik.docker.network=traefik_network
+      - traefik.http.routers.dispatcharr.rule=Host(`dispatch.${DOMAIN}`)
+      - traefik.http.routers.dispatcharr.entrypoints=websecure
+      - traefik.http.routers.dispatcharr.tls=true
+      - traefik.http.routers.dispatcharr.tls.certresolver=cloudflare
+      - traefik.http.routers.dispatcharr.middlewares=authelia@docker
+      - traefik.http.routers.dispatcharr.service=dispatcharr-service
+      - traefik.http.services.dispatcharr-service.loadbalancer.server.port=9191
       # Kuma
       - kuma.dispatcharr.http.name=Dispatcharr
-      - kuma.dispatcharr.http.url=${KUMA_DISPATCHARR_URL:-http://gluetun:9191}
+      - kuma.dispatcharr.http.url=${KUMA_DISPATCHARR_URL:-http://dispatcharr:9191}
 
 networks:
   default:

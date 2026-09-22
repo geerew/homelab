@@ -1,0 +1,22 @@
+---
+# EPL / UK sports channel groups for Strong8k (XC account).
+# Channel numbers are starting points; auto-sync assigns sequentially from each start.
+dispatcharr_epl_channel_groups:
+  # UK| EPL PREMIER LEAGUE PPV
+  - channel_group: 151
+    auto_sync_channel_start: 100
+  # UK| EPL PREMIER LEAGUE PPV VIP
+  - channel_group: 150
+    auto_sync_channel_start: 200
+  # UK| PREMIER LEAGUE+ PPV
+  - channel_group: 152
+    auto_sync_channel_start: 300
+  # UK| TNT SPORT HD VIP (TNT holds EPL rights)
+  - channel_group: 127
+    auto_sync_channel_start: 400
+  # UK| NOW TV SPORT (Sky Sports)
+  - channel_group: 123
+    auto_sync_channel_start: 500
+  # UK| SPORT SD (Sky Sports Main Event SD, etc.)
+  - channel_group: 134
+    auto_sync_channel_start: 600

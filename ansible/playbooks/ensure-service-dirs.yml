@@ -1,0 +1,17 @@
+---
+- name: Ensure homelab service data directories exist
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - ansible.builtin.import_tasks: ../tasks/ensure-service-dirs.yml
+
+    - name: Report service directories status
+      ansible.builtin.debug:
+        msg: >-
+          Service directories ready under {{ data_dir }}/services/.
+          Migrate existing data manually before restarting Compose (see ansible/README.md).

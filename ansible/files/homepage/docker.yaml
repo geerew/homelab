@@ -1,0 +1,5 @@
+# Managed by Ansible — edit ansible/files/homepage/docker.yaml
+# Deploy: ansible-playbook playbooks/deploy-homepage.yml
+---
+local:
+  socket: /var/run/docker.sock

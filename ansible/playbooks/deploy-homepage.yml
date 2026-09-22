@@ -1,0 +1,107 @@
+---
+- name: Deploy Homepage
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    homepage_static_configs:
+      - bookmarks.yaml
+      - settings.yaml
+      - widgets.yaml
+      - docker.yaml
+      - proxmox.yaml
+      - kubernetes.yaml
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Homepage variables in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DOMAIN is defined
+          - homelab_env.DOMAIN | length > 0
+          - homelab_env.DISPATCHARR_ADMIN_USERNAME is defined
+          - homelab_env.DISPATCHARR_ADMIN_USERNAME | length > 0
+          - homelab_env.DISPATCHARR_ADMIN_PASSWORD is defined
+          - homelab_env.DISPATCHARR_ADMIN_PASSWORD | length > 0
+          - homelab_env.GLUETUN_API_KEY is defined
+          - homelab_env.GLUETUN_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_JELLYFIN_API_KEY is defined
+          - homelab_env.HOMEPAGE_JELLYFIN_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY is defined
+          - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_MEALIE_API_KEY is defined
+          - homelab_env.HOMEPAGE_MEALIE_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_WALLOS_API_KEY is defined
+          - homelab_env.HOMEPAGE_WALLOS_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_SONARR_API_KEY is defined
+          - homelab_env.HOMEPAGE_SONARR_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_RADARR_API_KEY is defined
+          - homelab_env.HOMEPAGE_RADARR_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_PROWLARR_API_KEY is defined
+          - homelab_env.HOMEPAGE_PROWLARR_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_SEERR_API_KEY is defined
+          - homelab_env.HOMEPAGE_SEERR_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_BAZARR_API_KEY is defined
+          - homelab_env.HOMEPAGE_BAZARR_API_KEY | length > 0
+          - homelab_env.HOMEPAGE_TRAEFIK_USERNAME is defined
+          - homelab_env.HOMEPAGE_TRAEFIK_USERNAME | length > 0
+          - homelab_env.HOMEPAGE_TRAEFIK_PASSWORD is defined
+          - homelab_env.HOMEPAGE_TRAEFIK_PASSWORD | length > 0
+        fail_msg: >-
+          Set DOMAIN, DISPATCHARR_ADMIN_*, GLUETUN_API_KEY, and all HOMEPAGE_* widget
+          secrets in {{ env_file }} (see .env.example).
+      when: not ansible_check_mode
+
+    - name: Ensure Homepage config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/homepage/config"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Deploy static Homepage config files
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/homepage/{{ item }}"
+        dest: "{{ data_dir }}/services/homepage/config/{{ item }}"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      loop: "{{ homepage_static_configs }}"
+      register: homepage_static_configs_result
+
+    - name: Render services.yaml from template
+      ansible.builtin.template:
+        src: ../templates/homepage/services.yaml.j2
+        dest: "{{ data_dir }}/services/homepage/config/services.yaml"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      register: homepage_services_config
+      no_log: true
+
+    - name: Restart Homepage to pick up config changes
+      community.docker.docker_container:
+        name: homepage
+        state: started
+        restart: true
+      when:
+        - not ansible_check_mode
+        - >-
+          homepage_services_config.changed
+          or (homepage_static_configs_result.results | selectattr('changed') | list | length > 0)
+
+    - name: Report Homepage deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to render Homepage config into
+          {{ data_dir }}/services/homepage/config/.
+          {% elif homepage_services_config.changed or (homepage_static_configs_result.results | selectattr('changed') | list | length > 0) %}
+          Deployed Homepage config ({{ homepage_static_configs | length + 1 }} files) and restarted Homepage.
+          {% else %}
+          Homepage config unchanged — no restart needed.
+          {% endif %}

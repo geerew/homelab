@@ -1,0 +1,15 @@
+# Managed by Ansible — edit ansible/files/homepage/settings.yaml
+# Deploy: ansible-playbook playbooks/deploy-homepage.yml
+---
+color: stone
+target: _blank
+headerStyle: clean
+statusStyle: dot
+
+layout:
+  Services:
+    icon: mdi-server
+  Arr:
+    icon: mdi-movie-roll
+  System:
+    icon: mdi-shield-check

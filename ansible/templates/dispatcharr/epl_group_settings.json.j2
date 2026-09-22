@@ -1,0 +1,11 @@
+[
+{% for group in dispatcharr_epl_channel_groups %}
+  {
+    "channel_group": {{ group.channel_group }},
+    "enabled": true,
+    "auto_channel_sync": true,
+    "auto_sync_channel_start": {{ group.auto_sync_channel_start }}
+  }{% if not loop.last %},{% endif %}
+
+{% endfor %}
+]

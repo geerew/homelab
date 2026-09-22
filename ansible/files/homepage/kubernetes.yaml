@@ -1,0 +1,4 @@
+# Managed by Ansible — edit ansible/files/homepage/kubernetes.yaml
+# Deploy: ansible-playbook playbooks/deploy-homepage.yml
+---
+# sample kubernetes config

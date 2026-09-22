@@ -1,0 +1,48 @@
+---
+# Create persistent data directories under services/ (owned by PUID/PGID).
+# Does not move existing data — migrate top-level dirs manually before restarting Compose.
+- name: Ensure services root directory exists
+  ansible.builtin.file:
+    path: "{{ data_dir }}/services"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+
+- name: Ensure service data directories exist
+  ansible.builtin.file:
+    path: "{{ data_dir }}/services/{{ item }}"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+  loop:
+    - traefik/acme
+    - authelia/config
+    - uptime-kuma/data
+    - autokuma/data
+    - mccleanengineering/data
+    - homepage/config
+    - jellyfin/config
+    - jellyfin/cache
+    - jellyfin/logs
+    - jellyscope/data
+    - audiobookshelf/config
+    - audiobookshelf/metadata
+    - mealie/data
+    - wallos/db
+    - wallos/logos
+    - memos
+    - sparkyfitness/db
+    - sparkyfitness/backup
+    - sparkyfitness/uploads
+    - seerr/config
+    - gluetun
+    - qbittorrent/config
+    - sonarr/config
+    - radarr/config
+    - prowlarr/config
+    - bazarr/config
+    - dispatcharr/data
+    - dispatcharr/data/uploads
+    - dispatcharr/data/jwt

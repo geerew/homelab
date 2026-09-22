@@ -5,6 +5,8 @@
 
   pre_tasks:
     - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+    - ansible.builtin.import_tasks: ../tasks/ensure-service-dirs.yml
 
   tasks:
     - name: Deploy compose project

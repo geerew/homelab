@@ -1,0 +1,9 @@
+---
+- name: Deploy Dispatcharr
+  ansible.builtin.import_playbook: deploy-dispatcharr.yml
+
+- name: Deploy Gluetun
+  ansible.builtin.import_playbook: deploy-gluetun.yml
+
+- name: Deploy Homepage
+  ansible.builtin.import_playbook: deploy-homepage.yml

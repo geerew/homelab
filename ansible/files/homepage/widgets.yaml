@@ -1,0 +1,6 @@
+# Managed by Ansible — edit ansible/files/homepage/widgets.yaml
+# Deploy: ansible-playbook playbooks/deploy-homepage.yml
+---
+- resources:
+    cpu: true
+    memory: true
