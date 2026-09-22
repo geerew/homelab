@@ -1,0 +1,11 @@
+{% set ns = namespace(items=[]) -%}
+{% for rule in dispatcharr_provider_group_rules -%}
+{%   set matches = dispatcharr_channel_groups_response.json | selectattr('name', 'search', rule.name_pattern) | list -%}
+{%   if matches | length == 0 -%}
+{%     set _ = ns.items.append({
+      'name_pattern': rule.name_pattern,
+      'override_group': rule.override_group
+    }) -%}
+{%   endif -%}
+{% endfor -%}
+{{ ns.items | to_json }}

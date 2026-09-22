@@ -4,7 +4,17 @@
     "channel_group": {{ group.channel_group }},
     "enabled": true,
     "auto_channel_sync": true,
-    "auto_sync_channel_start": {{ group.auto_sync_channel_start }}
+    "auto_sync_channel_start": {{ group.auto_sync_channel_start }},
+    "custom_properties": {
+      "group_override": {{ dispatcharr_logical_group_map[group.override_group] }},
+      "channel_sort_order": "{{ group.channel_sort_order | default('name') }}",
+      "name_match_exclude_regex": {{ group.name_match_exclude_regex | to_json }},
+{% if group.name_match_regex is defined and group.name_match_regex %}
+      "name_match_regex": {{ group.name_match_regex | to_json }},
+{% endif %}
+      "name_regex_pattern": {{ group.name_regex_pattern | to_json }},
+      "name_replace_pattern": {{ group.name_replace_pattern | to_json }}
+    }
   }{% if not loop.last %},{% endif %}
 
 {% endfor %}

@@ -1,22 +1,68 @@
 ---
-# EPL / UK sports channel groups for Strong8k (XC account).
-# Channel numbers are starting points; auto-sync assigns sequentially from each start.
-dispatcharr_epl_channel_groups:
-  # UK| EPL PREMIER LEAGUE PPV
-  - channel_group: 151
+# Logical Dispatcharr channel groups (created by deploy-dispatcharr.yml if missing).
+# M3U source groups override into these for cleaner numbering and M3U group-title output.
+dispatcharr_logical_channel_groups:
+  - name: EPL
+  - name: TNT Sports
+  - name: Sky Sports HD
+  - name: Sky Sports SD
+  - name: US EPL
+
+# Applied to every provider group unless overridden on a rule below.
+# name_match_exclude_regex — streams skipped entirely (not synced as channels).
+# name_match_regex — only sync streams whose name matches (per-group filter).
+# name_regex_pattern / name_replace_pattern — rename on sync (JS-style regex).
+dispatcharr_channel_name_cleanup:
+  name_match_exclude_regex: '^#{2,}'
+  name_regex_pattern: '^(UK:|NOW:|US:)\s*'
+  name_replace_pattern: ''
+
+# Provider group rules — matched by name at deploy time (no hardcoded IDs).
+# Use "UK." / "US." instead of "UK|" — dot matches the pipe and avoids YAML escape pain.
+dispatcharr_provider_group_rules:
+  # --- UK ---
+  - name_pattern: 'UK. EPL PREMIER LEAGUE PPV'
+    override_group: EPL
     auto_sync_channel_start: 100
-  # UK| EPL PREMIER LEAGUE PPV VIP
-  - channel_group: 150
+    channel_sort_order: name
+  - name_pattern: 'UK. PREMIER LEAGUE[+] PPV'
+    override_group: EPL
+    auto_sync_channel_start: 100
+    channel_sort_order: name
+  - name_pattern: 'UK. TNT SPORT ᴴᴰ'
+    override_group: TNT Sports
     auto_sync_channel_start: 200
-  # UK| PREMIER LEAGUE+ PPV
-  - channel_group: 152
+    channel_sort_order: name
+  - name_pattern: 'UK. NOW TV SPORT'
+    override_group: Sky Sports HD
     auto_sync_channel_start: 300
-  # UK| TNT SPORT HD VIP (TNT holds EPL rights)
-  - channel_group: 127
+    channel_sort_order: name
+  - name_pattern: 'UK. SPORT SD'
+    override_group: Sky Sports SD
     auto_sync_channel_start: 400
-  # UK| NOW TV SPORT (Sky Sports)
-  - channel_group: 123
+    channel_sort_order: name
+  # --- US EPL (NBC/Peacock) ---
+  - name_pattern: 'US. PEACOCK ᴿᴬᵂ'
+    override_group: US EPL
     auto_sync_channel_start: 500
-  # UK| SPORT SD (Sky Sports Main Event SD, etc.)
-  - channel_group: 134
-    auto_sync_channel_start: 600
+    channel_sort_order: name
+    name_match_regex: 'PREMIER LEAGUE|NBC SPORTS NOW'
+  - name_pattern: 'US. SPORT ᴴᴰ/ᴿᴬᵂ'
+    override_group: US EPL
+    auto_sync_channel_start: 510
+    channel_sort_order: name
+    name_match_regex: 'PREMIER LEAGUE|NBC SPORTS NETWORK|USA NETWORK|FOX SOCCER'
+  - name_pattern: 'US. ENTERTAINMENT ᴴᴰ/ᴿᴬᵂ'
+    override_group: US EPL
+    auto_sync_channel_start: 520
+    channel_sort_order: name
+    name_match_regex: 'USA NETWORK'
+  - name_pattern: 'US. PEACOCK PPV ⱽᴵᴾ'
+    override_group: US EPL
+    auto_sync_channel_start: 530
+    channel_sort_order: name
+    name_match_exclude_regex: '(?i)^#{2,}|NO EVENT'
+  - name_pattern: 'US. PEACOCK PPV ⁽ᴮᴷ⁾'
+    override_group: US EPL
+    auto_sync_channel_start: 540
+    channel_sort_order: name

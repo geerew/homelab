@@ -1,0 +1,20 @@
+{% set ns = namespace(items=[], claimed=[]) -%}
+{% for rule in dispatcharr_provider_group_rules -%}
+{%   for g in dispatcharr_channel_groups_response.json | selectattr('name', 'search', rule.name_pattern) -%}
+{%     if g.id not in ns.claimed -%}
+{%       set _ = ns.items.append({
+        'channel_group': g.id,
+        'provider_group_name': g.name,
+        'override_group': rule.override_group,
+        'auto_sync_channel_start': rule.auto_sync_channel_start,
+        'channel_sort_order': rule.channel_sort_order | default('name'),
+        'name_match_exclude_regex': rule.name_match_exclude_regex | default(dispatcharr_channel_name_cleanup.name_match_exclude_regex),
+        'name_match_regex': rule.name_match_regex | default(none),
+        'name_regex_pattern': rule.name_regex_pattern | default(dispatcharr_channel_name_cleanup.name_regex_pattern),
+        'name_replace_pattern': rule.name_replace_pattern | default(dispatcharr_channel_name_cleanup.name_replace_pattern)
+      }) -%}
+{%       set _ = ns.claimed.append(g.id) -%}
+{%     endif -%}
+{%   endfor -%}
+{% endfor -%}
+{{ ns.items | to_json }}

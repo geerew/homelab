@@ -46,6 +46,16 @@
           Set DISPATCHARR_M3U_PASSWORD in {{ env_file }} before running this playbook.
       when: not ansible_check_mode
 
+    - name: Validate Dispatcharr XC password in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DISPATCHARR_XC_PASSWORD is defined
+          - homelab_env.DISPATCHARR_XC_PASSWORD | length > 0
+          - homelab_env.DISPATCHARR_XC_PASSWORD is match('^[A-Za-z0-9._@-]+$')
+        fail_msg: >-
+          Set DISPATCHARR_XC_PASSWORD in {{ env_file }} (letters, numbers, . _ @ - only; see .env.example).
+      when: not ansible_check_mode
+
     - name: Ensure Dispatcharr data directory exists
       ansible.builtin.file:
         path: "{{ data_dir }}/services/dispatcharr/data"
@@ -126,6 +136,50 @@
       no_log: true
       when: not ansible_check_mode
 
+    - name: List Dispatcharr users
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9191/api/accounts/users/
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        status_code: 200
+      register: dispatcharr_users_list
+      when: not ansible_check_mode
+
+    - name: Resolve Dispatcharr admin user id
+      ansible.builtin.set_fact:
+        dispatcharr_admin_user_id: >-
+          {{
+            dispatcharr_users_list.json
+            | selectattr('username', 'equalto', homelab_env.DISPATCHARR_ADMIN_USERNAME)
+            | map(attribute='id')
+            | first
+          }}
+      when: not ansible_check_mode
+
+    - name: Ensure Dispatcharr admin user exists for XC output
+      ansible.builtin.assert:
+        that:
+          - dispatcharr_admin_user_id is defined
+          - dispatcharr_admin_user_id | string | length > 0
+        fail_msg: >-
+          Dispatcharr user '{{ homelab_env.DISPATCHARR_ADMIN_USERNAME }}' not found.
+      when: not ansible_check_mode
+
+    - name: Set Dispatcharr XC password on admin user
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9191/api/accounts/users/{{ dispatcharr_admin_user_id }}/"
+        method: PATCH
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        body_format: json
+        body:
+          custom_properties:
+            xc_password: "{{ homelab_env.DISPATCHARR_XC_PASSWORD }}"
+        status_code: 200
+      register: dispatcharr_xc_password_set
+      no_log: true
+      when: not ansible_check_mode
+
     - name: List Dispatcharr M3U accounts
       ansible.builtin.uri:
         url: http://127.0.0.1:9191/api/m3u/accounts/
@@ -161,6 +215,7 @@
           password: "{{ homelab_env.DISPATCHARR_M3U_PASSWORD }}"
           is_active: true
           account_type: "{{ homelab_env.DISPATCHARR_M3U_ACCOUNT_TYPE | default('XC') }}"
+          max_streams: "{{ homelab_env.DISPATCHARR_M3U_MAX_STREAMS | default(1) | int }}"
         status_code: 201
       register: dispatcharr_m3u_create
       no_log: true
@@ -176,6 +231,19 @@
             if (dispatcharr_m3u_create is defined and dispatcharr_m3u_create is changed)
             else dispatcharr_m3u_existing.id
           }}
+      when: not ansible_check_mode
+
+    - name: Enforce max concurrent streams on M3U account
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:9191/api/m3u/accounts/{{ dispatcharr_m3u_account_id }}/"
+        method: PATCH
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        body_format: json
+        body:
+          max_streams: "{{ homelab_env.DISPATCHARR_M3U_MAX_STREAMS | default(1) | int }}"
+        status_code: 200
+      register: dispatcharr_m3u_max_streams
       when: not ansible_check_mode
 
     - name: Wait for XC group discovery after account creation
@@ -231,6 +299,123 @@
         - dispatcharr_m3u_poll is not skipped
         - dispatcharr_m3u_poll.json.status == 'error'
 
+    - name: List Dispatcharr channel groups
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9191/api/channels/groups/
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        status_code: 200
+      register: dispatcharr_channel_groups_response
+      when: not ansible_check_mode
+
+    - name: Resolve existing logical channel group names
+      ansible.builtin.set_fact:
+        dispatcharr_existing_group_names: >-
+          {{
+            dispatcharr_channel_groups_response.json
+            | map(attribute='name')
+            | list
+          }}
+      when: not ansible_check_mode
+
+    - name: Create missing logical channel groups
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9191/api/channels/groups/
+        method: POST
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        body_format: json
+        body:
+          name: "{{ item.name }}"
+        status_code: 201
+      loop: "{{ dispatcharr_logical_channel_groups }}"
+      when:
+        - not ansible_check_mode
+        - item.name not in dispatcharr_existing_group_names
+      register: dispatcharr_logical_groups_create
+
+    - name: Reload Dispatcharr channel groups for logical group mapping
+      ansible.builtin.uri:
+        url: http://127.0.0.1:9191/api/channels/groups/
+        headers:
+          Authorization: "Bearer {{ dispatcharr_token.json.access }}"
+        status_code: 200
+      register: dispatcharr_channel_groups_response
+      when: not ansible_check_mode
+
+    - name: Build logical channel group id map
+      ansible.builtin.set_fact:
+        dispatcharr_logical_group_map: >-
+          {{
+            dict(
+              dispatcharr_channel_groups_response.json
+              | map(attribute='name')
+              | zip(
+                  dispatcharr_channel_groups_response.json
+                  | map(attribute='id')
+                )
+            )
+          }}
+      when: not ansible_check_mode
+
+    - name: Resolve provider group name patterns to channel group IDs
+      ansible.builtin.set_fact:
+        dispatcharr_epl_channel_groups: "{{ dispatcharr_epl_channel_groups_resolved }}"
+        dispatcharr_unmatched_provider_rules: "{{ dispatcharr_unmatched_rules }}"
+      vars:
+        dispatcharr_epl_channel_groups_resolved: >-
+          {{
+            lookup('ansible.builtin.template', '../templates/dispatcharr/resolve_provider_groups.json.j2')
+            | from_json
+          }}
+        dispatcharr_unmatched_rules: >-
+          {{
+            lookup('ansible.builtin.template', '../templates/dispatcharr/unmatched_provider_rules.json.j2')
+            | from_json
+          }}
+      when: not ansible_check_mode
+
+    - name: Warn when provider group rules match nothing
+      ansible.builtin.debug:
+        msg: >-
+          Provider group rule '{{ item.name_pattern }}' → {{ item.override_group }}
+          matched no groups in Dispatcharr. Strong may have renamed the group — update
+          name_pattern in vars/dispatcharr_epl_channel_groups.yml.
+      loop: "{{ dispatcharr_unmatched_provider_rules }}"
+      when:
+        - not ansible_check_mode
+        - dispatcharr_unmatched_provider_rules | length > 0
+
+    - name: Fail when no provider groups resolved
+      ansible.builtin.fail:
+        msg: >-
+          No provider groups matched dispatcharr_provider_group_rules.
+          Check vars/dispatcharr_epl_channel_groups.yml name_pattern values against
+          Dispatcharr → M3U Manager → Groups.
+      when:
+        - not ansible_check_mode
+        - dispatcharr_epl_channel_groups | length == 0
+
+    - name: Show resolved provider group mappings
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.provider_group_name }} (id {{ item.channel_group }})
+          → {{ item.override_group }} @ {{ item.auto_sync_channel_start }}+
+      loop: "{{ dispatcharr_epl_channel_groups }}"
+      loop_control:
+        label: "{{ item.provider_group_name }}"
+      when: not ansible_check_mode
+
+    - name: Validate logical channel group overrides exist
+      ansible.builtin.assert:
+        that:
+          - item.override_group in dispatcharr_logical_group_map
+        fail_msg: >-
+          Logical channel group '{{ item.override_group }}' is missing in Dispatcharr.
+          Expected groups: {{ dispatcharr_logical_channel_groups | map(attribute='name') | list | join(', ') }}
+      loop: "{{ dispatcharr_epl_channel_groups }}"
+      when: not ansible_check_mode
+
     - name: Enable auto channel sync for EPL/sports groups
       ansible.builtin.uri:
         url: "http://127.0.0.1:9191/api/m3u/accounts/{{ dispatcharr_m3u_account_id }}/group-settings/"
@@ -272,6 +457,29 @@
         - not ansible_check_mode
         - dispatcharr_channel_sync is not skipped
 
+    - name: Verify Dispatcharr logical channel group counts
+      community.docker.docker_container_exec:
+        container: dispatcharr
+        command: >-
+          python manage.py shell -c
+          "from apps.channels.models import Channel, ChannelGroup;
+          names='{{ dispatcharr_logical_channel_groups | map(attribute='name') | join('|') }}'.split('|');
+          out={};
+          [out.update({n: Channel.objects.filter(
+          channel_group=ChannelGroup.objects.filter(name=n).first(),
+          hidden_from_output=False).count()}) for n in names];
+          print(out)"
+      register: dispatcharr_group_counts
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Parse Dispatcharr logical channel group counts
+      ansible.builtin.set_fact:
+        dispatcharr_logical_group_counts: "{{ dispatcharr_group_counts.stdout_lines | last | default('{}') }}"
+      when:
+        - not ansible_check_mode
+        - dispatcharr_group_counts is not skipped
+
     - name: Report Dispatcharr configure status
       ansible.builtin.debug:
         msg: >-
@@ -283,5 +491,9 @@
           Admin: {{ 'already existed' if dispatcharr_user_exists else 'created' }} ('{{ homelab_env.DISPATCHARR_ADMIN_USERNAME }}').
           M3U: {% if dispatcharr_m3u_refresh is skipped %}already complete{% elif dispatcharr_m3u_poll is not skipped %}refreshed ({{ dispatcharr_m3u_poll.json.status }}){% else %}account configured{% endif %}.
           Channels: {{ dispatcharr_channel_sync_result | default('sync skipped') }}.
-          UI: https://dispatch.{{ homelab_env.DOMAIN }}/ — Jellyfin HDHR: http://dispatcharr:9191/hdhr
+          Logical groups: {{ dispatcharr_logical_group_counts | default('not verified') }}.
+          Provider rules: {{ dispatcharr_epl_channel_groups | length }} group(s) resolved.
+          Name cleanup: exclude {{ dispatcharr_channel_name_cleanup.name_match_exclude_regex }},
+          strip {{ dispatcharr_channel_name_cleanup.name_regex_pattern }}.
+          UI: https://dispatch.{{ homelab_env.DOMAIN }}/ — XC (IPTV): https://dispatch.{{ homelab_env.DOMAIN }} user={{ homelab_env.DISPATCHARR_ADMIN_USERNAME }} — Jellyfin M3U: http://dispatcharr:9191/output/m3u/
           {% endif %}

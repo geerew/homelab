@@ -1,0 +1,3 @@
+---
+- name: Bootstrap Dispatcharr (alias)
+  ansible.builtin.import_playbook: deploy-dispatcharr.yml

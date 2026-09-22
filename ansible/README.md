@@ -24,10 +24,11 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | --- | --- |
 | `playbooks/site.yml` | Ensure `services/` dirs + deploy the full Docker Compose stack |
 | `playbooks/ensure-service-dirs.yml` | Create `services/` directory tree only (no Compose) |
-| `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + EPL/sports channels (idempotent) |
+| `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
+| `playbooks/bootstrap-dispatcharr.yml` | Alias for `deploy-dispatcharr.yml` |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
-| `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, custom CSS, Live TV channel list) |
+| `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
 | `playbooks/deploy-services.yml` | Dispatcharr + Gluetun + Homepage + Jellyfin |
 
 ## Usage
@@ -47,7 +48,7 @@ ansible-playbook playbooks/deploy-gluetun.yml
 # Deploy Homepage config (widget creds/keys from .env)
 ansible-playbook playbooks/deploy-homepage.yml
 
-# Deploy Jellyfin config (custom CSS, Live TV channel list)
+# Deploy Jellyfin config (custom CSS, M3U tuner, Live TV list layout)
 ansible-playbook playbooks/deploy-jellyfin.yml
 
 # Deploy all app services (Dispatcharr + Gluetun + Homepage + Jellyfin)
@@ -90,8 +91,9 @@ Custom CSS and the Live TV channel list layout deploy to `services/jellyfin/conf
 | Intro Skipper, Authelia SSO button | [`files/jellyfin/custom.css`](files/jellyfin/custom.css) |
 | Live TV channel list layout | [`files/jellyfin/livetv-channels-list.css`](files/jellyfin/livetv-channels-list.css) |
 | `branding.xml` wrapper | [`templates/jellyfin/branding.xml.j2`](templates/jellyfin/branding.xml.j2) |
+| Live TV M3U tuner | [`templates/jellyfin/livetv.xml.j2`](templates/jellyfin/livetv.xml.j2) |
 
-Edit the Ansible sources, then run `deploy-jellyfin.yml`. Do not edit `branding.xml` in the Jellyfin UI — changes will be overwritten on the next deploy. Jellyfin caches branding at startup, so the playbook restarts the container when `branding.xml` changes; hard-refresh the browser after deploy.
+Edit the Ansible sources, then run `deploy-jellyfin.yml`. Do not edit `branding.xml` or `livetv.xml` in the Jellyfin UI — changes will be overwritten on the next deploy. Jellyfin caches config at startup, so the playbook restarts the container when either file changes; hard-refresh the browser after deploy.
 
 ### Migrating data to `services/`
 
@@ -153,6 +155,7 @@ DISPATCHARR_M3U_URL=http://cf.strong8high.xyz
 DISPATCHARR_M3U_USERNAME=your-provider-username
 DISPATCHARR_M3U_PASSWORD=your-provider-password
 DISPATCHARR_M3U_ACCOUNT_TYPE=XC
+DISPATCHARR_M3U_MAX_STREAMS=1
 ```
 
 Use `XC` for Xtream Codes (base URL + username/password). Use `STD` for a direct M3U playlist URL. The playbook skips creation if an account with the same name already exists.
@@ -161,18 +164,47 @@ XC accounts have a two-step setup: create discovers channel groups (`pending_set
 
 EPL/sports channel groups are defined in [`vars/dispatcharr_epl_channel_groups.yml`](vars/dispatcharr_epl_channel_groups.yml):
 
-- EPL Premier League PPV (+ VIP) and Premier League+
-- TNT Sport HD and NOW TV Sport (Sky)
+- **Logical groups** (created automatically): `EPL`, `TNT Sports`, `Sky Sports HD`, `Sky Sports SD`, `US EPL`
+- **Provider groups** are matched by **name regex** at deploy time (no hardcoded IDs — survives Strong reshuffles)
+- Each rule maps matching provider groups into a logical group with a fixed channel-number block (EPL 100+, TNT 200+, Sky HD 300+, Sky SD 400+)
+- **Name cleanup** on sync (Dispatcharr built-ins):
+  - Skip separator streams: `^#{2,}` (e.g. `##### PREMIER LEAGUE #####`)
+  - Strip prefixes: `UK:`, `NOW:`, `US:` from channel names
+  - **US EPL** (500+): filtered Peacock/NBC/USA Network groups for US Premier League coverage
+- Channels are sorted **by name** within each block on sync
 
-Channels are numbered from 100, 200, 300, etc. Test playback via **Channels** in the UI, VLC with `https://dispatch.${DOMAIN}/output/m3u/`, or Jellyfin Live TV (`http://dispatcharr:9191/hdhr`).
+To add a provider group: add a `name_pattern` rule to [`vars/dispatcharr_epl_channel_groups.yml`](vars/dispatcharr_epl_channel_groups.yml), then re-run `deploy-dispatcharr.yml`. The playbook prints resolved group names/IDs and warns if a pattern matches nothing.
+
+Test playback via **Channels** in the UI, VLC with `https://dispatch.${DOMAIN}/output/m3u/`, or Jellyfin Live TV (M3U tuner, deployed by `deploy-jellyfin.yml`).
 
 Dispatcharr runs **outside** Gluetun so IPTV provider traffic uses your home IP (many providers block VPN/datacenter exits). *arr apps stay on the VPN.
 
+### IPTV clients (UHF, iPlayTV, etc.) — remote XC access
+
+Set `DISPATCHARR_XC_PASSWORD` in `.env` (letters, numbers, `.`, `_`, `@`, `-` only). `deploy-dispatcharr.yml` applies it to your admin user as the XC password.
+
+Traefik exposes two routes on `dispatch.${DOMAIN}`:
+
+- **UI + raw M3U** (`/output/m3u`, `/output/epg`) — behind Authelia
+- **XC API** (`/get.php`, `/player_api.php`, `/live/…`, `/xmltv.php`) — no Authelia; Dispatcharr validates username + XC password
+
+In your IPTV app, choose **Xtream Codes** (not plain M3U):
+
+| Field | Value |
+|-------|--------|
+| Server / URL | `https://dispatch.${DOMAIN}` |
+| Username | `DISPATCHARR_ADMIN_USERNAME` |
+| Password | `DISPATCHARR_XC_PASSWORD` |
+
+EPG is usually discovered automatically via XC. Do **not** share the raw `/output/m3u` URL — it has no built-in password (Authelia only protects it via the web domain).
+
 ### Jellyfin Live TV
 
-Add an **HDHomeRun** tuner at `http://dispatcharr:9191/hdhr` (not `gluetun:9191`). If Dispatcharr was moved off the VPN, update the tuner URL in **Dashboard → Live TV** and refresh channels — Jellyfin caches stream URLs and will fail with `Connection refused (gluetun:9191)` until re-scanned.
+`deploy-jellyfin.yml` configures an **M3U tuner** pointing at Dispatcharr (`http://dispatcharr:9191/output/m3u/`). Dispatcharr exports `group-title` from the logical channel groups (EPL, TNT Sports, Sky Sports HD, Sky Sports SD). On first deploy the playbook removes the legacy HDHomeRun tuner, re-imports channels from M3U, and styles Dispatcharr's separator rows as section headers in the list CSS.
 
-The Live TV channel list uses a list layout via custom CSS in `files/jellyfin/livetv-channels-list.css` (deployed by `deploy-jellyfin.yml`). The rules target Jellyfin 12+ (`#liveTvPage` and `#channelsTab`, flex row cards). Tweak that file if logos or text overlap on your screen size.
+Requires `JELLYFIN_API_KEY` in `.env` (Dashboard → API Keys) so the playbook can register the tuner and refresh channels.
+
+The Live TV channel list uses a list layout via custom CSS in `files/jellyfin/livetv-channels-list.css`. The rules target Jellyfin 12+ (`#liveTvPage` and `#channelsTab`, flex row cards). Tweak that file if logos or text overlap on your screen size.
 
 ## Notes
 

@@ -222,3 +222,34 @@
 #channelsTab .cardFooterLogo {
     display: none;
 }
+
+/* Dispatcharr group separator rows (##### PREMIER LEAGUE #####, etc.) */
+#liveTvPage .card[data-context="livetv"]:has(.cardText-first a[title*="##"]) {
+    margin-top: 0.85em !important;
+    padding: 0.55em 0.75em !important;
+    background-color: rgba(0, 164, 220, 0.14) !important;
+    border-top: 1px solid rgba(0, 164, 220, 0.25);
+    cursor: default;
+}
+
+#liveTvPage .card[data-context="livetv"]:has(.cardText-first a[title*="##"]):hover,
+#liveTvPage .card[data-context="livetv"]:has(.cardText-first a[title*="##"]):focus-within {
+    background-color: rgba(0, 164, 220, 0.14) !important;
+}
+
+#liveTvPage .card[data-context="livetv"]:has(.cardText-first a[title*="##"]) .cardBox,
+#liveTvPage .card[data-context="livetv"]:has(.cardText-first a[title*="##"]) .cardOverlayContainer {
+    display: none !important;
+}
+
+#liveTvPage .card[data-context="livetv"]:has(.cardText-first a[title*="##"]) .cardText-first {
+    padding: 0 !important;
+}
+
+#liveTvPage .card[data-context="livetv"]:has(.cardText-first a[title*="##"]) .cardText-first a {
+    font-size: 0.92rem !important;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #00a4dc;
+    text-transform: uppercase;
+}
