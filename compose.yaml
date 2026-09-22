@@ -116,7 +116,7 @@ services:
       - DOCKER_HOST=tcp://socket-proxy:2375
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ${DATA_DIR}/traefik/acme/acme.json:/acme.json
+      - ${DATA_DIR}/services/traefik/acme/acme.json:/acme.json
     command:
       - --entrypoints.traefik.address=:8080
       - --entrypoints.web.address=:80
@@ -162,7 +162,7 @@ services:
     networks:
       - traefik_network
     volumes:
-      - ${DATA_DIR}/authelia/config:/config
+      - ${DATA_DIR}/services/authelia/config:/config
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -190,7 +190,7 @@ services:
       - DOCKER_HOST=tcp://socket-proxy:2375
       - TZ=${TZ}
     volumes:
-      - ${DATA_DIR}/uptime-kuma/data:/app/data
+      - ${DATA_DIR}/services/uptime-kuma/data:/app/data
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -214,7 +214,7 @@ services:
       - AUTOKUMA__KUMA__SYNC_INTERVAL=60
       - TZ=${TZ}
     volumes:
-      - ${DATA_DIR}/autokuma/data:/data
+      - ${DATA_DIR}/services/autokuma/data:/data
     networks:
       - traefik_network
       - socket_proxy
@@ -267,7 +267,7 @@ services:
       - MCCLEAN_ADMIN_USERNAME=${MCCLEAN_ADMIN_USERNAME}
       - MCCLEAN_ADMIN_PASSWORD=${MCCLEAN_ADMIN_PASSWORD}
     volumes:
-      - ${DATA_DIR}/mccleanengineering/data:/mcclean_data
+      - ${DATA_DIR}/services/mccleanengineering/data:/mcclean_data
     entrypoint: ["/usr/local/bin/mcclean", "serve", "--data-dir", "/mcclean_data", "--http", "0.0.0.0:8080"]
     labels:
       # Watchtower
@@ -299,7 +299,7 @@ services:
       - HOMEPAGE_ALLOWED_HOSTS=home.${DOMAIN},192.168.90.0/24
       - DOCKER_HOST=tcp://socket-proxy:2375
     volumes:
-      - ${DATA_DIR}/homepage/config:/app/config
+      - ${DATA_DIR}/services/homepage/config:/app/config
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -330,9 +330,9 @@ services:
     environment:
       - TZ=${TZ}
     volumes:
-      - ${DATA_DIR}/jellyfin/config:/config
-      - ${DATA_DIR}/jellyfin/cache:/cache
-      - ${DATA_DIR}/jellyfin/logs:/logs
+      - ${DATA_DIR}/services/jellyfin/config:/config
+      - ${DATA_DIR}/services/jellyfin/cache:/cache
+      - ${DATA_DIR}/services/jellyfin/logs:/logs
       - ${MEDIA1_DIR}:/media
       - ${MEDIA2_DIR}:/media2
     devices:
@@ -373,7 +373,7 @@ services:
       - LANG=en_US.UTF-8
       - LC_ALL=en_US.UTF-8
     volumes:
-      - ${DATA_DIR}/jellyscope/data:/app/data
+      - ${DATA_DIR}/services/jellyscope/data:/app/data
       - ${MEDIA1_DIR}:/media:ro
       - ${MEDIA2_DIR}:/media2:ro
     labels:
@@ -414,8 +414,8 @@ services:
       - TZ=${TZ}
     volumes:
       - ${AUDIOBOOKS_DIR}:/audiobooks
-      - ${DATA_DIR}/audiobookshelf/config:/config
-      - ${DATA_DIR}/audiobookshelf/metadata:/metadata
+      - ${DATA_DIR}/services/audiobookshelf/config:/config
+      - ${DATA_DIR}/services/audiobookshelf/metadata:/metadata
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -438,7 +438,7 @@ services:
     networks:
       - traefik_network
     volumes:
-      - ${DATA_DIR}/mealie/data:/app/data
+      - ${DATA_DIR}/services/mealie/data:/app/data
     environment:
       - PUID=${PUID}
       - PGID=${PGID}
@@ -483,8 +483,8 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
     volumes:
-      - ${DATA_DIR}/wallos/db:/var/www/html/db
-      - ${DATA_DIR}/wallos/logos:/var/www/html/images/uploads/logos
+      - ${DATA_DIR}/services/wallos/db:/var/www/html/db
+      - ${DATA_DIR}/services/wallos/logos:/var/www/html/images/uploads/logos
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -509,7 +509,7 @@ services:
     environment:
       - TZ=${TZ}
     volumes:
-      - ${DATA_DIR}/memos:/var/opt/memos
+      - ${DATA_DIR}/services/memos:/var/opt/memos
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -538,7 +538,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
     volumes:
-      - ${DATA_DIR}/sparkyfitness/db:/var/lib/postgresql
+      - ${DATA_DIR}/services/sparkyfitness/db:/var/lib/postgresql
 
 
   sparkyfitness-server:
@@ -577,8 +577,8 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
     volumes:
-      - ${DATA_DIR}/sparkyfitness/backup:/app/SparkyFitnessServer/backup
-      - ${DATA_DIR}/sparkyfitness/uploads:/app/SparkyFitnessServer/uploads
+      - ${DATA_DIR}/services/sparkyfitness/backup:/app/SparkyFitnessServer/backup
+      - ${DATA_DIR}/services/sparkyfitness/uploads:/app/SparkyFitnessServer/uploads
 
   sparkyfitness-frontend:
     image: codewithcj/sparkyfitness:latest
@@ -620,7 +620,7 @@ services:
     networks:
       - traefik_network
     volumes:
-      - ${DATA_DIR}/seerr/config:/app/config
+      - ${DATA_DIR}/services/seerr/config:/app/config
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1
       start_period: 20s
@@ -643,54 +643,6 @@ services:
       - kuma.seerr.http.url=http://seerr:5055
       - kuma.seerr.http.interval=60
 
-  yamtrack-redis:
-    image: redis:8-alpine
-    container_name: yamtrack-redis
-    restart: unless-stopped
-    user: "${PUID}:${PGID}"
-    networks:
-      - traefik_network
-    volumes:
-      - ${DATA_DIR}/yamtrack/redis:/data
-
-  yamtrack:
-    image: ghcr.io/fuzzygrim/yamtrack:latest
-    container_name: yamtrack
-    restart: unless-stopped
-    depends_on:
-      - yamtrack-redis
-    networks:
-      - traefik_network
-    environment:
-      - TZ=${TZ}
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - SECRET=${YAMTRACK_SECRET}
-      - REDIS_URL=redis://yamtrack-redis:6379
-      - URLS=https://track.${DOMAIN}
-      - ADMIN_ENABLED=True
-      - SOCIALACCOUNT_ONLY=True
-      - REDIRECT_LOGIN_TO_SSO=True
-      - ACCOUNT_DEFAULT_HTTP_PROTOCOL=https
-      - SOCIAL_PROVIDERS=allauth.socialaccount.providers.openid_connect
-      - "SOCIALACCOUNT_PROVIDERS={\"openid_connect\":{\"OAUTH_PKCE_ENABLED\":true,\"APPS\":[{\"provider_id\":\"authelia\",\"name\":\"Authelia\",\"client_id\":\"yamtrack\",\"secret\":\"${OIDC_CLIENT_SECRET}\",\"settings\":{\"server_url\":\"https://auth.${DOMAIN}/.well-known/openid-configuration\"}}]}}"
-    volumes:
-      - ${DATA_DIR}/yamtrack/db:/yamtrack/db
-    labels:
-      # Watchtower
-      - com.centurylinklabs.watchtower.enable=true
-      # Traefik (Authelia OIDC login — no forward-auth middleware)
-      - traefik.enable=true
-      - traefik.http.routers.yamtrack.rule=Host(`track.${DOMAIN}`)
-      - traefik.http.routers.yamtrack.entrypoints=websecure
-      - traefik.http.routers.yamtrack.tls=true
-      - traefik.http.routers.yamtrack.tls.certresolver=cloudflare
-      - traefik.http.services.yamtrack.loadbalancer.server.port=8000
-      # Kuma
-      - kuma.yamtrack.http.name=Yamtrack
-      - kuma.yamtrack.http.url=http://yamtrack:8000
-      - kuma.yamtrack.http.interval=60
-
   gluetun:
     image: qmcgaw/gluetun:latest
     container_name: gluetun
@@ -698,6 +650,8 @@ services:
       - NET_ADMIN
     devices:
       - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ${DATA_DIR}/services/gluetun/config.toml:/gluetun/auth/config.toml:ro
     environment:
       - VPN_SERVICE_PROVIDER=mullvad
       - VPN_TYPE=wireguard
@@ -792,7 +746,7 @@ services:
       - TZ=${TZ}
       - WEBUI_PORT=9865
     volumes:
-      - ${DATA_DIR}/qbittorrent/config:/config
+      - ${DATA_DIR}/services/qbittorrent/config:/config
       - ${DOWNLOADS_DIR}:/downloads
     restart: unless-stopped
     labels:
@@ -814,7 +768,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
     volumes:
-      - ${DATA_DIR}/sonarr/config:/config
+      - ${DATA_DIR}/services/sonarr/config:/config
       - ${MEDIA1_DIR}:/media
       - ${MEDIA2_DIR}:/media2
       - ${DOWNLOADS_DIR}:/downloads
@@ -837,7 +791,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
     volumes:
-      - ${DATA_DIR}/radarr/config:/config
+      - ${DATA_DIR}/services/radarr/config:/config
       - ${MEDIA1_DIR}:/media
       - ${MEDIA2_DIR}:/media2
       - ${DOWNLOADS_DIR}:/downloads
@@ -860,7 +814,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
     volumes:
-      - ${DATA_DIR}/prowlarr/config:/config
+      - ${DATA_DIR}/services/prowlarr/config:/config
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -880,7 +834,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
     volumes:
-      - ${DATA_DIR}/bazarr/config:/config
+      - ${DATA_DIR}/services/bazarr/config:/config
       - ${MEDIA1_DIR}:/media
       - ${MEDIA2_DIR}:/media2
     labels:
@@ -911,7 +865,7 @@ services:
       # Block web signup — admin is created by ansible/playbooks/bootstrap-dispatcharr.yml
       - DISPATCHARR_SETUP_ALLOWED_IP=${DISPATCHARR_SETUP_ALLOWED_IP:-127.0.0.1}
     volumes:
-      - ${DATA_DIR}/dispatcharr/data:/data
+      - ${DATA_DIR}/services/dispatcharr/data:/data
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128
     labels:

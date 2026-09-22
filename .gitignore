@@ -6,67 +6,8 @@
 # Old compose files (moved here; contain secrets)
 archive/
 
-# Service data directories – ignore everything except top-level .keep files
-# Top-level directories exist (via .keep), child dirs created by services with correct ownership
-traefik/*
-!traefik/.keep
-
-authelia/*
-!authelia/.keep
-
-uptime-kuma/*
-!uptime-kuma/.keep
-
-homepage/*
-!homepage/.keep
-
-jellyfin/*
-!jellyfin/.keep
-
-audiobookshelf/*
-!audiobookshelf/.keep
-
-mealie/*
-!mealie/.keep
-
-wallos/*
-!wallos/.keep
-
-trilium/*
-!trilium/.keep
-
-jellyseerr/*
-!jellyseerr/.keep
-
-qbittorrent/*
-!qbittorrent/.keep
-
-sonarr/*
-!sonarr/.keep
-
-radarr/*
-!radarr/.keep
-
-prowlarr/*
-!prowlarr/.keep
-
-bazarr/*
-!bazarr/.keep
-
-autokuma/*
-!autokuma/.keep
-
-offcourse/*
-!offcourse/.keep
-
-dispatcharr/*
-!dispatcharr/.keep
-
-yamtrack/*
-!yamtrack/.keep
-
-mccleanengineering/*
-!mccleanengineering/.keep
+# All service data lives under services/ — created by Ansible, not in Git
+services/
 
 # Ansible – no secrets here; credentials live in .env only
 ansible/*.retry

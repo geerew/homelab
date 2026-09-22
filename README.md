@@ -13,9 +13,9 @@ Single Compose file for Traefik, Authelia, media apps, and VPN-backed services (
 2. **Traefik ACME file**
    Ensure the ACME JSON file exists and has strict permissions (required for TLS):
    ```bash
-   mkdir -p "${DATA_DIR}/traefik/acme"
-   touch "${DATA_DIR}/traefik/acme/acme.json"
-   chmod 600 "${DATA_DIR}/traefik/acme/acme.json"
+   mkdir -p "${DATA_DIR}/services/traefik/acme"
+   touch "${DATA_DIR}/services/traefik/acme/acme.json"
+   chmod 600 "${DATA_DIR}/services/traefik/acme/acme.json"
    ```
    If you use a different `DATA_DIR` in `.env`, run the same with that path.
 
@@ -28,7 +28,7 @@ Single Compose file for Traefik, Authelia, media apps, and VPN-backed services (
 
 ## Service data
 
-Service data (configs, databases, cache) is stored under the directories listed in `.gitignore` (e.g. `authelia/`, `jellyfin/`, `traefik/`). Only `.keep` files are committed so the folder structure exists after clone; **all other contents are ignored**. Populate or restore these directories yourself (e.g. from backup or by letting the apps create them on first run). Back up `DATA_DIR` (or each service folder) separately if you need to preserve data.
+Service data (configs, databases, cache) lives under `services/` (gitignored). Ansible creates the directory tree on deploy; Compose bind-mounts from `${DATA_DIR}/services/<app>/`. Populate or restore from backup as needed.
 
 ## Changing the shared OIDC secret
 
