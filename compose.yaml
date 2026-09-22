@@ -866,12 +866,21 @@ services:
       # Traefik
       - traefik.enable=true
       - traefik.docker.network=traefik_network
+      # UI + unauthenticated M3U output — Authelia protected
       - traefik.http.routers.dispatcharr.rule=Host(`dispatch.${DOMAIN}`)
       - traefik.http.routers.dispatcharr.entrypoints=websecure
       - traefik.http.routers.dispatcharr.tls=true
       - traefik.http.routers.dispatcharr.tls.certresolver=cloudflare
       - traefik.http.routers.dispatcharr.middlewares=authelia@docker
+      - traefik.http.routers.dispatcharr.priority=1
       - traefik.http.routers.dispatcharr.service=dispatcharr-service
+      # XC API for IPTV clients — no Authelia; Dispatcharr validates username + XC password
+      - traefik.http.routers.dispatcharr-xc.rule=Host(`dispatch.${DOMAIN}`) && (Path(`/get.php`) || Path(`/player_api.php`) || Path(`/panel_api.php`) || Path(`/xmltv.php`) || PathPrefix(`/live/`) || PathPrefix(`/movie/`) || PathPrefix(`/series/`) || PathPrefix(`/timeshift/`) || Path(`/streaming/timeshift.php`))
+      - traefik.http.routers.dispatcharr-xc.entrypoints=websecure
+      - traefik.http.routers.dispatcharr-xc.tls=true
+      - traefik.http.routers.dispatcharr-xc.tls.certresolver=cloudflare
+      - traefik.http.routers.dispatcharr-xc.priority=100
+      - traefik.http.routers.dispatcharr-xc.service=dispatcharr-service
       - traefik.http.services.dispatcharr-service.loadbalancer.server.port=9191
       # Kuma
       - kuma.dispatcharr.http.name=Dispatcharr
