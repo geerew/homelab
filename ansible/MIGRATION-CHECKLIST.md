@@ -71,10 +71,10 @@ ansible-playbook playbooks/deploy-services.yml
 | **Playbook** | `playbooks/deploy-authelia.yml` |
 | **In `deploy-services.yml`** | Yes |
 | **Ansible sources** | `authelia-users.yml`, `authelia-jwks.pem` (repo root, gitignored), `templates/authelia/*.j2`, `vars/authelia_oidc_clients.yml`, `tasks/resolve-docker-network-subnets.yml`, `tasks/authelia-resolve-oidc-client-secret.yml` |
-| **`.env` keys** | `DOMAIN`, `AUTHELIA_SESSION_SECRET`, `AUTHELIA_JWT_SECRET`, `AUTHELIA_STORAGE_ENCRYPTION_KEY`, `AUTHELIA_OIDC_HMAC_SECRET`, `OIDC_CLIENT_SECRET` |
+| **`.env` keys** | `DOMAIN`, `AUTHELIA_SESSION_SECRET`, `AUTHELIA_JWT_SECRET`, `AUTHELIA_STORAGE_ENCRYPTION_KEY`, `AUTHELIA_OIDC_HMAC_SECRET`, `AUTHELIA_JWKS_FILE`, `OIDC_CLIENT_SECRET` |
 | **Configured by Ansible** | `users.yml` (argon2 hashes), `configuration.yml` (session/storage/OIDC secrets, JWKS, 6 OIDC clients, CORS, vpn-status bypass subnets, access rules) |
 | **Auto-managed at runtime (not Ansible)** | `db.sqlite3` — created on first start; stores OIDC consents, 2FA enrollments, session persistence (encrypted with `AUTHELIA_STORAGE_ENCRYPTION_KEY`). `notification.txt` — append-only log for the filesystem notifier (password-reset emails); empty until something triggers a notification. Neither needs templating or migration work. |
-| **Fresh stand-up** | Copy `authelia-users.example.yml` → `authelia-users.yml`, set secrets in `.env`, extract JWKS PEM → `authelia-jwks.pem`, run `deploy-authelia.yml`. Authelia creates an empty DB on first start — no manual setup. |
+| **Fresh stand-up** | Copy `authelia-users.example.yml` → `authelia-users.yml`, set secrets + `AUTHELIA_JWKS_FILE` in `.env`, generate PEM at that path, run `deploy-authelia.yml`. Authelia creates an empty DB on first start — no manual setup. |
 | **Existing install** | Keep `db.sqlite3` when migrating (preserves 2FA devices and OIDC consents). Back up before wiping `services/authelia/config/`. |
 
 ---

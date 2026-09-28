@@ -98,7 +98,7 @@ Authelia config is split across `.env`, gitignored files, and committed Ansible 
 | Output | Source |
 | --- | --- |
 | `services/authelia/config/users.yml` | `authelia-users.yml` (repo root, gitignored) → [`templates/authelia/users.yml.j2`](templates/authelia/users.yml.j2) |
-| `services/authelia/config/configuration.yml` | [`templates/authelia/configuration.yml.j2`](templates/authelia/configuration.yml.j2) + `.env` + [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml) + `authelia-jwks.pem` |
+| `services/authelia/config/configuration.yml` | [`templates/authelia/configuration.yml.j2`](templates/authelia/configuration.yml.j2) + `.env` + [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml) + PEM at `AUTHELIA_JWKS_FILE` |
 
 Do not edit `users.yml` or `configuration.yml` directly — changes will be overwritten on the next deploy.
 
@@ -126,7 +126,14 @@ Use `password:` for plain text (Ansible hashes with argon2 at deploy time), or `
 | `AUTHELIA_OIDC_HMAC_SECRET` | OIDC HMAC |
 | `OIDC_CLIENT_SECRET` | Plain secret shared by all OIDC apps; PBKDF2-hashed into `configuration.yml` at deploy |
 
-**JWKS private key** — extract once from your existing `configuration.yml` into `authelia-jwks.pem` at the repo root (gitignored). Never regenerate unless deliberately rotating OIDC signing keys.
+**OIDC signing key (`AUTHELIA_JWKS_FILE`)** — path in `.env` to an RSA private key PEM (default `./authelia-jwks.pem`, gitignored). Authelia uses it to sign OIDC tokens for Mealie/Jellyfin/etc. Deploy fails if the var is unset or the file is missing. Ansible embeds the PEM into `configuration.yml` but never generates it — create once before first deploy:
+
+```bash
+docker run --rm -v "$PWD:/out" authelia/authelia:latest \
+  authelia crypto pair rsa generate -d /out --file.private-key authelia-jwks.pem
+```
+
+Only regenerate when deliberately rotating OIDC signing keys.
 
 **OIDC clients** — structure (redirect URIs, scopes, etc.) lives in [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml). Active clients: Audiobookshelf, Jellyfin, Mealie, Memos, Sparky Fitness, Wallos.
 

@@ -25,14 +25,22 @@
           - homelab_env.AUTHELIA_OIDC_HMAC_SECRET | length > 0
           - homelab_env.DOMAIN is defined
           - homelab_env.DOMAIN | length > 0
+          - homelab_env.AUTHELIA_JWKS_FILE is defined
+          - homelab_env.AUTHELIA_JWKS_FILE | length > 0
         fail_msg: >-
           Set AUTHELIA_SESSION_SECRET, AUTHELIA_JWT_SECRET, AUTHELIA_STORAGE_ENCRYPTION_KEY,
-          AUTHELIA_OIDC_HMAC_SECRET, and DOMAIN in {{ env_file }} (see .env.example).
+          AUTHELIA_OIDC_HMAC_SECRET, AUTHELIA_JWKS_FILE, and DOMAIN in {{ env_file }}
+          (see .env.example).
       when: not ansible_check_mode
 
     - name: Resolve Authelia JWKS file path
       ansible.builtin.set_fact:
-        authelia_jwks_file: "{{ homelab_env.AUTHELIA_JWKS_FILE | default(homelab_dir + '/authelia-jwks.pem') }}"
+        authelia_jwks_file: >-
+          {%- if homelab_env.AUTHELIA_JWKS_FILE.startswith('/') -%}
+          {{ homelab_env.AUTHELIA_JWKS_FILE }}
+          {%- else -%}
+          {{ homelab_dir }}/{{ homelab_env.AUTHELIA_JWKS_FILE | regex_replace('^\\.?/', '') }}
+          {%- endif -%}
 
     - name: Check Authelia JWKS file exists
       ansible.builtin.stat:
@@ -42,8 +50,9 @@
     - name: Fail when Authelia JWKS file is missing
       ansible.builtin.fail:
         msg: >-
-          Create {{ authelia_jwks_file }} by extracting the private key from your existing
-          configuration.yml (see ansible/README.md). Never regenerate unless rotating OIDC keys.
+          AUTHELIA_JWKS_FILE is set to {{ homelab_env.AUTHELIA_JWKS_FILE }} but
+          {{ authelia_jwks_file }} does not exist. Generate the OIDC signing key before first
+          deploy (see .env.example).
       when: not authelia_jwks_file_stat.stat.exists
 
     - ansible.builtin.import_tasks: ../tasks/resolve-docker-network-subnets.yml
