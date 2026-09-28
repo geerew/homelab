@@ -1,0 +1,84 @@
+---
+# Kuma v2 shows a database wizard when data/ is empty. Until SQLite is chosen, /socket.io/
+# returns HTML and bootstrap fails. UPTIME_KUMA_DB_TYPE=sqlite in compose avoids this on first
+# boot; this task covers wiped data dirs and containers started before that env was added.
+- name: Wait for Uptime Kuma HTTP endpoint
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - curlimages/curl:latest
+      - -sf
+      - http://uptime-kuma:3001/setup-database-info
+  register: uptime_kuma_setup_wait
+  until: uptime_kuma_setup_wait.rc == 0
+  retries: 18
+  delay: 10
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Read Uptime Kuma database setup state
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - curlimages/curl:latest
+      - -sf
+      - http://uptime-kuma:3001/setup-database-info
+  register: uptime_kuma_db_setup
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Parse Uptime Kuma database setup state
+  ansible.builtin.set_fact:
+    uptime_kuma_db_needs_setup: "{{ (uptime_kuma_db_setup.stdout | from_json).needSetup | default(false) }}"
+  when: not ansible_check_mode
+
+- name: Initialize Uptime Kuma SQLite database
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - curlimages/curl:latest
+      - -sf
+      - -X
+      - POST
+      - http://uptime-kuma:3001/setup-database
+      - -H
+      - "Content-Type: application/json"
+      - -d
+      - '{"dbConfig":{"type":"sqlite"}}'
+  register: uptime_kuma_db_init
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - uptime_kuma_db_needs_setup | bool
+
+- name: Wait for Uptime Kuma main server after database init
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - curlimages/curl:latest
+      - -sf
+      - http://uptime-kuma:3001/api/entry-page
+  register: uptime_kuma_api_ready
+  until: uptime_kuma_api_ready.rc == 0
+  retries: 18
+  delay: 5
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - uptime_kuma_db_init is changed

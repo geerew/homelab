@@ -1,0 +1,49 @@
+---
+# Expects homelab_env, data_dir, env_file; optional uptime_kuma_sync_strict (default false).
+- name: Ensure Uptime Kuma config directory exists
+  ansible.builtin.file:
+    path: "{{ data_dir }}/services/uptime-kuma"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+
+- name: Render status page sync config
+  ansible.builtin.template:
+    src: ../templates/uptime-kuma/status-page.json.j2
+    dest: "{{ data_dir }}/services/uptime-kuma/status-page.json"
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0644"
+  register: uptime_kuma_status_page_config
+
+- name: Build status page sync command
+  ansible.builtin.set_fact:
+    uptime_kuma_sync_shell: >-
+      pip install -q uptime-kuma-api requests &&
+      python /sync.py
+      --url http://uptime-kuma:3001
+      --slug {{ uptime_kuma_status_page_slug }}
+      --config /config.json
+      {{ '--strict' if uptime_kuma_sync_strict | default(false) | bool else '' }}
+
+- name: Sync Uptime Kuma status page groups
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - -v
+      - "{{ playbook_dir }}/../scripts/sync_uptime_kuma_status_page.py:/sync.py:ro"
+      - -v
+      - "{{ data_dir }}/services/uptime-kuma/status-page.json:/config.json:ro"
+      - python:3.12-slim
+      - sh
+      - -c
+      - "{{ uptime_kuma_sync_shell }}"
+  register: uptime_kuma_status_page_sync
+  changed_when: "'Updated status page' in uptime_kuma_status_page_sync.stdout"
+  failed_when: uptime_kuma_status_page_sync.rc != 0
+  when: not ansible_check_mode

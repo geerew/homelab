@@ -11,11 +11,13 @@
 #   4. Traefik          — static + dynamic config (Authelia forward-auth middleware)
 #   5. Cloudflare DDNS  — keeps DNS records pointed at this host
 #   6. Authelia         — auth provider; resolves traefik_network / socket_proxy subnets
-#   7. Gluetun          — VPN gateway; Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent share its network
-#   8. Dispatcharr      — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
-#   9. qBittorrent      — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
-#  10. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
-#  11. Homepage         — service list + widgets reference the above (deploy last)
+#   7. Uptime Kuma      — status dashboard; public page slug `default` for Homepage widget
+#   8. Autokuma         — creates monitors from Compose kuma.* labels; syncs status page groups
+#   9. Gluetun          — VPN gateway; Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent share its network
+#  10. Dispatcharr      — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
+#  11. qBittorrent      — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
+#  12. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
+#  13. Homepage         — service list + widgets reference the above (deploy last)
 
 - name: Deploy Socket Proxy
   ansible.builtin.import_playbook: deploy-socket-proxy.yml
@@ -34,6 +36,12 @@
 
 - name: Deploy Authelia
   ansible.builtin.import_playbook: deploy-authelia.yml
+
+- name: Deploy Uptime Kuma
+  ansible.builtin.import_playbook: deploy-uptime-kuma.yml
+
+- name: Deploy Autokuma
+  ansible.builtin.import_playbook: deploy-autokuma.yml
 
 - name: Deploy Gluetun
   ansible.builtin.import_playbook: deploy-gluetun.yml

@@ -1,0 +1,22 @@
+---
+- name: Bootstrap Uptime Kuma on first install (disable dashboard auth)
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - -v
+      - "{{ playbook_dir }}/../scripts/sync_uptime_kuma_status_page.py:/sync.py:ro"
+      - python:3.12-slim
+      - sh
+      - -c
+      - pip install -q uptime-kuma-api requests && python /sync.py --url http://uptime-kuma:3001 --bootstrap-only
+  register: uptime_kuma_bootstrap
+  changed_when: "'Bootstrapped Uptime Kuma' in uptime_kuma_bootstrap.stdout"
+  failed_when: uptime_kuma_bootstrap.rc != 0
+  retries: 3
+  delay: 10
+  until: uptime_kuma_bootstrap.rc == 0
+  when: not ansible_check_mode

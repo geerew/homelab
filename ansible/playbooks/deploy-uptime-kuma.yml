@@ -1,0 +1,48 @@
+---
+- name: Deploy Uptime Kuma
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - ../vars/uptime_kuma_status_page.yml
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Apply Uptime Kuma container configuration
+      ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: uptime-kuma
+
+    - name: Wait for Uptime Kuma container to become healthy
+      ansible.builtin.command:
+        argv:
+          - docker
+          - inspect
+          - --format
+          - "{{ '{{' }}.State.Health.Status{{ '}}' }}"
+          - uptime-kuma
+      register: uptime_kuma_health
+      until: uptime_kuma_health.stdout == "healthy"
+      retries: 18
+      delay: 10
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Initialize Uptime Kuma SQLite database when needed
+      ansible.builtin.import_tasks: ../tasks/setup-uptime-kuma-database.yml
+
+    - name: Bootstrap Uptime Kuma on first install
+      ansible.builtin.import_tasks: ../tasks/bootstrap-uptime-kuma.yml
+
+    - name: Report Uptime Kuma deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to apply Uptime Kuma from {{ env_file }}.
+          {% else %}
+          Uptime Kuma running at https://status.{{ homelab_env.DOMAIN }}/
+          (dashboard auth disabled; Authelia at edge; public page /status/{{ uptime_kuma_status_page_slug }}).
+          {% endif %}

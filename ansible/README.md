@@ -32,6 +32,8 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-traefik.yml` | Render Traefik static config + Authelia forward-auth middleware |
 | `playbooks/deploy-cloudflare-ddns.yml` | Validate Cloudflare DDNS `.env` settings and apply container config |
 | `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from templates, `.env`, and vars |
+| `playbooks/deploy-uptime-kuma.yml` | Start Uptime Kuma; wait for health |
+| `playbooks/deploy-autokuma.yml` | Start Autokuma; sync public status page groups via Kuma API |
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
@@ -62,6 +64,10 @@ ansible-playbook playbooks/deploy-cloudflare-ddns.yml
 
 # Deploy Authelia users + configuration
 ansible-playbook playbooks/deploy-authelia.yml
+
+# Deploy Uptime Kuma + Autokuma (monitors from labels; status page from vars)
+ansible-playbook playbooks/deploy-uptime-kuma.yml
+ansible-playbook playbooks/deploy-autokuma.yml
 
 # Deploy Dispatcharr (admin + M3U provider + EPL/sports channels)
 ansible-playbook playbooks/deploy-dispatcharr.yml
@@ -95,13 +101,15 @@ Run `site.yml` before any deploy playbook — Socket Proxy must be up before Tra
 | 4 | `deploy-traefik.yml` | Socket Proxy on `:2375` |
 | 5 | `deploy-cloudflare-ddns.yml` | `CLOUDFLARE_API_TOKEN`, DDNS vars in `.env` |
 | 6 | `deploy-authelia.yml` | `traefik_network`, `socket_proxy` from Compose |
-| 7 | `deploy-gluetun.yml` | Compose stack up |
-| 8 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
-| 9 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
-| 10 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
-| 11 | `deploy-homepage.yml` | — (last) |
+| 7 | `deploy-uptime-kuma.yml` | Compose stack up |
+| 8 | `deploy-autokuma.yml` | Uptime Kuma healthy; syncs `/status/default` groups |
+| 9 | `deploy-gluetun.yml` | Compose stack up |
+| 10 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
+| 11 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
+| 12 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
+| 13 | `deploy-homepage.yml` | — (last) |
 
-Use `deploy-services.yml` to run steps 1–11 in this order automatically.
+Use `deploy-services.yml` to run steps 1–13 in this order automatically.
 
 ### Socket Proxy
 
@@ -116,6 +124,20 @@ Auto-updates containers labelled `com.centurylinklabs.watchtower.enable=true`. S
 | `WATCHTOWER_CLEANUP` | Remove old images after update |
 | `WATCHTOWER_POLL_INTERVAL` | Check interval in seconds |
 | `WATCHTOWER_LABEL_ENABLE` | Only update labelled containers |
+
+### Uptime Kuma + Autokuma
+
+Status dashboard at `https://status.${DOMAIN}/` (Authelia on the admin UI; public page at `/status/default` for the Homepage widget).
+
+| Component | Role |
+| --- | --- |
+| **Compose `kuma.*` labels** | Declarative monitor definitions (HTTP, Docker, port checks) |
+| **Autokuma** | Creates/updates monitors in Kuma from those labels via Socket Proxy |
+| **Ansible** | Syncs the public status page layout (`Services`, `Arr`, `System`) from [`vars/uptime_kuma_status_page.yml`](vars/uptime_kuma_status_page.yml) |
+
+Kuma dashboard auth is **disabled** (`disableAuth=true`) — Authelia handles browser access at Traefik. Autokuma and Ansible talk to Kuma on the Docker network with auto-login; no `.env` credentials needed. On a **fresh install**, `deploy-uptime-kuma.yml` bootstraps Kuma (creates an internal user, immediately disables dashboard auth). `deploy-autokuma.yml` syncs the public status page at `/status/default`, which the **Homepage widget reads** (`slug: default` in `services.yaml.j2`). Edit group membership in [`vars/uptime_kuma_status_page.yml`](vars/uptime_kuma_status_page.yml), not manually in the UI, or Ansible will overwrite changes on the next deploy.
+
+Optional: override per-monitor health URLs with `KUMA_SONARR_URL`, `KUMA_RADARR_URL`, etc. when `/ping` is insufficient.
 
 ### Dozzle
 

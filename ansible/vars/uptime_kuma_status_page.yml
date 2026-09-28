@@ -1,0 +1,42 @@
+---
+# Public status page layout for https://status.${DOMAIN}/status/default
+# Monitor names must match AutoKuma label kuma.*.<type>.name values in compose.yaml.
+
+uptime_kuma_status_page_slug: default
+uptime_kuma_status_page_title: Default
+
+uptime_kuma_status_page_groups:
+  - name: Services
+    weight: 1
+    monitors:
+      - Jellyfin
+      - Jellyscope
+      - Audiobookshelf
+      - Mealie
+      - Wallos
+      - Memos
+      - McClean Engineering
+      - SparkyFitness
+      - Homepage
+      - qBittorrent
+
+  - name: Arr
+    weight: 2
+    monitors:
+      - Sonarr
+      - Radarr
+      - Prowlarr
+      - Bazarr
+      - Dispatcharr
+      - Seerr
+
+  - name: System
+    weight: 3
+    monitors:
+      - Traefik
+      - Authelia
+      - VPN Gateway
+      - Dozzle
+      - Cloudflare DDNS
+      - Watchtower
+      - Socket Proxy

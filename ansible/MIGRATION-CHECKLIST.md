@@ -253,6 +253,36 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 ---
 
+### Uptime Kuma — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-uptime-kuma.yml` |
+| **In `deploy-services.yml`** | Yes (before Autokuma) |
+| **Ansible sources** | `vars/uptime_kuma_status_page.yml`, `templates/uptime-kuma/status-page.json.j2`, `scripts/sync_uptime_kuma_status_page.py` |
+| **`.env` keys** | None required |
+| **Configured by Ansible** | Container via Compose; waits for health; first-install bootstrap (`disableAuth=true`) |
+| **Configured via AutoKuma + Compose** | Individual monitors from `kuma.*` labels on each service |
+| **Still outside Ansible** | Notification channels, incidents, maintenance windows, dashboard-only settings in SQLite |
+| **Fresh stand-up** | Wipe `services/uptime-kuma/data/*`, run `deploy-uptime-kuma.yml` (SQLite via `UPTIME_KUMA_DB_TYPE`, bootstrap disables dashboard auth), then `deploy-autokuma.yml` |
+
+---
+
+### Autokuma — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-autokuma.yml` |
+| **In `deploy-services.yml`** | Yes (after Uptime Kuma) |
+| **Ansible sources** | `tasks/sync-uptime-kuma-status-page.yml`, `vars/uptime_kuma_status_page.yml` |
+| **`.env` keys** | None required (auto-login when `disableAuth=true`) |
+| **Configured by Ansible** | Autokuma container; status page layout (`Services` / `Arr` / `System` on slug `default` for Homepage widget) |
+| **Configured via Compose labels** | Monitor definitions (`kuma.<id>.http|docker|port.*` on each service) |
+| **Still outside Ansible** | `services/autokuma/data/` state DB (monitor ID mapping) |
+| **Fresh stand-up** | Run after `deploy-uptime-kuma.yml` (bootstrap disables dashboard auth); ensure `kuma.*` labels in `compose.yaml` |
+
+---
+
 ## Services without deploy playbooks (todo)
 
 Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sonarr/Radarr/Prowlarr/Bazarr) → **Seerr** → OIDC apps → rest.
@@ -271,8 +301,8 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 
 | Service | Compose only today | Config location | Suggested `deploy-*` scope |
 | --- | --- | --- | --- |
-| **Uptime Kuma** | ⬜ | `services/uptime-kuma/data/` (SQLite) | `deploy-uptime-kuma.yml` — monitors from Compose `kuma.*` labels + API; backup/restore strategy |
-| **Autokuma** | ⬜ | `services/autokuma/data/` | `deploy-autokuma.yml` — pair with Kuma URL/API key from `.env` |
+| **Uptime Kuma** | ✅ | `services/uptime-kuma/data/` (SQLite) | `deploy-uptime-kuma.yml` — container + status page API sync |
+| **Autokuma** | ✅ | `services/autokuma/data/` | `deploy-autokuma.yml` — label sync + status page groups |
 | **Dozzle** | ✅ | `.env` only | `deploy-dozzle.yml` — log level, filter, Socket Proxy host, forward-auth header |
 
 ### Media stack (*arr + requests)
@@ -316,7 +346,7 @@ Work top-to-bottom; each step should leave the stack usable.
 6. **Seerr** — depends on Jellyfin + *arr
 7. **Jellyfin** — libraries, OIDC, encoding (biggest remaining gap)
 8. **Audiobookshelf / Mealie / Wallos** — OIDC clients overlap with Authelia work
-9. **Uptime Kuma + Autokuma** — mostly derived from existing Compose labels
+9. ~~**Uptime Kuma + Autokuma**~~ — done (AutoKuma monitors from labels; Ansible syncs `/status/default` groups)
 10. **Sparky Fitness / Jellyscope / McClean / Memos** — as needed
 
 ---

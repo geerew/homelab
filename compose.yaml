@@ -95,6 +95,9 @@ services:
       - kuma.socket_proxy_docker_host.docker_host.name=Socket Proxy (Docker)
       - kuma.socket_proxy_docker_host.docker_host.connection_type=tcp
       - kuma.socket_proxy_docker_host.docker_host.path=tcp://socket-proxy:2375
+      - kuma.socket_proxy.docker.name=Socket Proxy
+      - kuma.socket_proxy.docker.docker_container=socket-proxy
+      - kuma.socket_proxy.docker.docker_host_name=socket_proxy_docker_host
 
   traefik:
     image: traefik:v3.0
@@ -163,6 +166,8 @@ services:
     environment:
       - DOCKER_HOST=tcp://socket-proxy:2375
       - TZ=${TZ}
+      # Skip Kuma v2 database wizard on fresh install (empty data/)
+      - UPTIME_KUMA_DB_TYPE=sqlite
     volumes:
       - ${DATA_DIR}/services/uptime-kuma/data:/app/data
     labels:
