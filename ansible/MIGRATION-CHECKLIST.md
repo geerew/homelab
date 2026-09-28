@@ -172,7 +172,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Playbook** | `playbooks/deploy-dispatcharr.yml` |
 | **In `deploy-services.yml`** | Yes |
 | **Ansible sources** | `vars/dispatcharr_epl_channel_groups.yml`, `templates/dispatcharr/*.j2` |
-| **`.env` keys** | `DISPATCHARR_ADMIN_*`, `DISPATCHARR_M3U_*`, `DISPATCHARR_XC_PASSWORD` |
+| **`.env` keys** | `DISPATCHARR_ADMIN_*`, `DISPATCHARR_M3U_*` (incl. `DISPATCHARR_M3U_REFRESH_INTERVAL`), `DISPATCHARR_XC_PASSWORD` |
 | **Configured by Ansible** | Superuser bootstrap, M3U/XC account create + refresh, max streams, XC password on admin, logical channel groups (EPL/TNT/Sky/US EPL), provider group regex mapping, auto channel sync, unmatched provider rules |
 | **Still outside Ansible** | `DISPATCHARR_TRUSTED_PROXIES` (Compose env only), Traefik labels (Compose), SQLite DB / uploads beyond bootstrap |
 | **Fresh stand-up** | Wipe `services/dispatcharr/data/*`, run `site.yml` then `deploy-dispatcharr.yml` |

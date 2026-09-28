@@ -33,9 +33,13 @@
           - homelab_env.DISPATCHARR_M3U_URL | length > 0
           - homelab_env.DISPATCHARR_M3U_USERNAME is defined
           - homelab_env.DISPATCHARR_M3U_USERNAME | length > 0
+          - homelab_env.DISPATCHARR_M3U_REFRESH_INTERVAL is defined
+          - homelab_env.DISPATCHARR_M3U_REFRESH_INTERVAL | length > 0
+          - homelab_env.DISPATCHARR_M3U_REFRESH_INTERVAL | int >= 0
         fail_msg: >-
-          Set DISPATCHARR_M3U_NAME, DISPATCHARR_M3U_URL, and DISPATCHARR_M3U_USERNAME
-          in {{ env_file }} (see .env.example).
+          Set DISPATCHARR_M3U_NAME, DISPATCHARR_M3U_URL, DISPATCHARR_M3U_USERNAME, and
+          DISPATCHARR_M3U_REFRESH_INTERVAL (hours; 0 = disabled) in {{ env_file }}
+          (see .env.example).
 
     - name: Validate Dispatcharr M3U password in .env
       ansible.builtin.assert:
@@ -216,6 +220,7 @@
           is_active: true
           account_type: "{{ homelab_env.DISPATCHARR_M3U_ACCOUNT_TYPE | default('XC') }}"
           max_streams: "{{ homelab_env.DISPATCHARR_M3U_MAX_STREAMS | default(1) | int }}"
+          refresh_interval: "{{ homelab_env.DISPATCHARR_M3U_REFRESH_INTERVAL | int }}"
         status_code: 201
       register: dispatcharr_m3u_create
       no_log: true
@@ -233,7 +238,7 @@
           }}
       when: not ansible_check_mode
 
-    - name: Enforce max concurrent streams on M3U account
+    - name: Enforce M3U account settings
       ansible.builtin.uri:
         url: "http://127.0.0.1:9191/api/m3u/accounts/{{ dispatcharr_m3u_account_id }}/"
         method: PATCH
@@ -242,8 +247,9 @@
         body_format: json
         body:
           max_streams: "{{ homelab_env.DISPATCHARR_M3U_MAX_STREAMS | default(1) | int }}"
+          refresh_interval: "{{ homelab_env.DISPATCHARR_M3U_REFRESH_INTERVAL | int }}"
         status_code: 200
-      register: dispatcharr_m3u_max_streams
+      register: dispatcharr_m3u_settings
       when: not ansible_check_mode
 
     - name: Wait for XC group discovery after account creation

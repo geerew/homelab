@@ -312,9 +312,12 @@ DISPATCHARR_M3U_USERNAME=your-provider-username
 DISPATCHARR_M3U_PASSWORD=your-provider-password
 DISPATCHARR_M3U_ACCOUNT_TYPE=XC
 DISPATCHARR_M3U_MAX_STREAMS=1
+DISPATCHARR_M3U_REFRESH_INTERVAL=24
 ```
 
 Use `XC` for Xtream Codes (base URL + username/password). Use `STD` for a direct M3U playlist URL. The playbook skips creation if an account with the same name already exists.
+
+`DISPATCHARR_M3U_REFRESH_INTERVAL` sets Dispatcharr’s scheduled provider refresh in hours (`0` = disabled). After each refresh, Dispatcharr auto-runs channel sync for groups with `auto_channel_sync` enabled (configured by this playbook).
 
 XC accounts have a two-step setup: create discovers channel groups (`pending_setup`), then a full refresh imports streams. The playbook handles both steps automatically and waits for `success`. Re-run it if an account is stuck on `pending_setup`.
 
