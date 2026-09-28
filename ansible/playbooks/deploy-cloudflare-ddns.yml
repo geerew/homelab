@@ -1,0 +1,48 @@
+---
+- name: Deploy Cloudflare DDNS
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Cloudflare DDNS settings in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.CLOUDFLARE_API_TOKEN is defined
+          - homelab_env.CLOUDFLARE_API_TOKEN | length > 0
+          - homelab_env.CLOUDFLARE_DDNS_DOMAINS is defined
+          - homelab_env.CLOUDFLARE_DDNS_DOMAINS | length > 0
+          - homelab_env.CLOUDFLARE_DDNS_PROXIED is defined
+          - homelab_env.CLOUDFLARE_DDNS_PROXIED | length > 0
+          - homelab_env.CLOUDFLARE_DDNS_DETECTION_MODE is defined
+          - homelab_env.CLOUDFLARE_DDNS_DETECTION_MODE | length > 0
+          - homelab_env.CLOUDFLARE_DDNS_HTTP_TIMEOUT is defined
+          - homelab_env.CLOUDFLARE_DDNS_HTTP_TIMEOUT | length > 0
+        fail_msg: >-
+          Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_DDNS_* variables in {{ env_file }}
+          (see .env.example).
+      when: not ansible_check_mode
+
+    - name: Apply Cloudflare DDNS container configuration
+      community.docker.docker_compose_v2:
+        project_src: "{{ homelab_dir }}"
+        env_files:
+          - "{{ env_file }}"
+        services:
+          - cloudflare-ddns
+        state: present
+      when: not ansible_check_mode
+      register: cloudflare_ddns_compose
+
+    - name: Report Cloudflare DDNS deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to apply Cloudflare DDNS settings from {{ env_file }}.
+          {% else %}
+          Cloudflare DDNS configured for {{ homelab_env.CLOUDFLARE_DDNS_DOMAINS }}
+          (proxied={{ homelab_env.CLOUDFLARE_DDNS_PROXIED }}, detection={{ homelab_env.CLOUDFLARE_DDNS_DETECTION_MODE }}).
+          {% endif %}

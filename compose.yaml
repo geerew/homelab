@@ -30,10 +30,10 @@ services:
     environment:
       - TZ=${TZ}
       - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
-      - DOMAINS=${DOMAIN},*.${DOMAIN}
-      - PROXIED=true
-      - DETECTION_MODE=cloudflare.trace
-      - HTTP_TIMEOUT=10s
+      - DOMAINS=${CLOUDFLARE_DDNS_DOMAINS}
+      - PROXIED=${CLOUDFLARE_DDNS_PROXIED}
+      - DETECTION_MODE=${CLOUDFLARE_DDNS_DETECTION_MODE}
+      - HTTP_TIMEOUT=${CLOUDFLARE_DDNS_HTTP_TIMEOUT}
     dns:
       - 1.1.1.1
       - 8.8.8.8

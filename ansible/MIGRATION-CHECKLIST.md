@@ -31,8 +31,9 @@ ansible-playbook playbooks/deploy-services.yml   # 2. all app config in dependen
 Or step through individually (same order as `deploy-services.yml`):
 
 ```bash
-ansible-playbook playbooks/deploy-traefik.yml      # edge config; before Authelia middleware goes live
-ansible-playbook playbooks/deploy-authelia.yml     # auth; needs Docker networks from site.yml
+ansible-playbook playbooks/deploy-traefik.yml          # edge config; before Authelia middleware goes live
+ansible-playbook playbooks/deploy-cloudflare-ddns.yml  # DNS records from .env
+ansible-playbook playbooks/deploy-authelia.yml         # auth; needs Docker networks from site.yml
 ansible-playbook playbooks/deploy-gluetun.yml      # VPN before *arr / qBittorrent
 ansible-playbook playbooks/deploy-dispatcharr.yml  # IPTV; before Jellyfin Live TV
 ansible-playbook playbooks/deploy-qbittorrent.yml  # WebUI on gluetun network
@@ -46,6 +47,7 @@ ansible-playbook playbooks/deploy-homepage.yml     # widgets last
 | --- | --- |
 | `site.yml` | — (run first: containers + `traefik_network` / `socket_proxy`) |
 | `deploy-traefik.yml` | `site.yml` |
+| `deploy-cloudflare-ddns.yml` | `site.yml`, `CLOUDFLARE_API_TOKEN` |
 | `deploy-authelia.yml` | `site.yml` (subnet auto-detect) |
 | `deploy-gluetun.yml` | `site.yml` |
 | `deploy-dispatcharr.yml` | `site.yml` (Dispatcharr container on `:9191`; also ensures Gluetun stack is up) |
@@ -60,6 +62,7 @@ ansible-playbook playbooks/deploy-homepage.yml     # widgets last
 | Service | Playbook | Fully configured? |
 | --- | --- | --- |
 | **Traefik** | `deploy-traefik.yml` | **Yes** — static config + Authelia forward-auth middleware; `acme.json` is runtime |
+| **Cloudflare DDNS** | `deploy-cloudflare-ddns.yml` | **Yes** — settings in `.env`; no on-disk config |
 | **Authelia** | `deploy-authelia.yml` | **Yes** — `users.yml` + `configuration.yml` templated; SQLite DB + notification log are auto-created at runtime (not Ansible todos) |
 | **Dispatcharr** | `deploy-dispatcharr.yml` | **Yes** — admin, M3U/XC provider, XC password, EPL/sports channel groups, auto channel sync |
 | **Gluetun** | `deploy-gluetun.yml` | **Yes** — VPN settings in `.env`, HTTP control-server auth in `config.toml`; ports/Traefik labels stay in Compose |
@@ -96,6 +99,20 @@ ansible-playbook playbooks/deploy-homepage.yml     # widgets last
 | **Still in Compose only** | Per-service router labels, Kuma labels, image version, port 80/443 publish |
 | **Auto-managed at runtime (not Ansible)** | `acme.json` — Let's Encrypt certificates; created/renewed by Traefik |
 | **Fresh stand-up** | Set Traefik/DNS vars in `.env`, run `deploy-traefik.yml`, then `docker compose up -d traefik` |
+
+---
+
+### Cloudflare DDNS — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-cloudflare-ddns.yml` |
+| **In `deploy-services.yml`** | Yes (after Traefik) |
+| **Ansible sources** | None — configuration is entirely from `.env` via Compose |
+| **`.env` keys** | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_DDNS_DOMAINS`, `CLOUDFLARE_DDNS_PROXIED`, `CLOUDFLARE_DDNS_DETECTION_MODE`, `CLOUDFLARE_DDNS_HTTP_TIMEOUT` |
+| **Configured by Ansible** | Validates `.env` and applies `docker compose up -d cloudflare-ddns` |
+| **Still in Compose only** | Kuma labels, image version, DNS servers (`1.1.1.1`, `8.8.8.8`) |
+| **Fresh stand-up** | Set Cloudflare DDNS vars in `.env`, run `deploy-cloudflare-ddns.yml` |
 
 ---
 
@@ -195,7 +212,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | --- | --- | --- | --- |
 | **Traefik** | ✅ | `services/traefik/traefik.yml`, `dynamic/authelia.yml`, `acme/acme.json` | `deploy-traefik.yml` — static + Authelia middleware; per-service routes stay on Compose labels |
 | **Authelia** | ✅ | `services/authelia/config/configuration.yml`, `users.yml` | `deploy-authelia.yml` — config done; `db.sqlite3` / `notification.txt` auto-created at runtime |
-| **Cloudflare DDNS** | ⬜ | Compose env | `deploy-cloudflare-ddns.yml` — likely env-only, low priority |
+| **Cloudflare DDNS** | ✅ | `.env` only | `deploy-cloudflare-ddns.yml` — DNS record settings in `.env` |
 | **Socket proxy** | ⬜ | Compose only | Skip — no app config |
 | **Watchtower** | ⬜ | Compose only | Skip — no app config |
 

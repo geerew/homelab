@@ -27,6 +27,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/site.yml` | Ensure `services/` dirs + deploy the full Docker Compose stack |
 | `playbooks/ensure-service-dirs.yml` | Create `services/` directory tree only (no Compose) |
 | `playbooks/deploy-traefik.yml` | Render Traefik static config + Authelia forward-auth middleware |
+| `playbooks/deploy-cloudflare-ddns.yml` | Validate Cloudflare DDNS `.env` settings and apply container config |
 | `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from templates, `.env`, and vars |
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
@@ -45,6 +46,9 @@ ansible-playbook playbooks/site.yml
 
 # Deploy Traefik static config + Authelia middleware
 ansible-playbook playbooks/deploy-traefik.yml
+
+# Apply Cloudflare DDNS settings from .env
+ansible-playbook playbooks/deploy-cloudflare-ddns.yml
 
 # Deploy Authelia users + configuration
 ansible-playbook playbooks/deploy-authelia.yml
@@ -76,14 +80,15 @@ Run `site.yml` before any deploy playbook — Traefik/Authelia need Docker netwo
 | --- | --- | --- |
 | 0 | `site.yml` | — |
 | 1 | `deploy-traefik.yml` | Compose stack up |
-| 2 | `deploy-authelia.yml` | `traefik_network`, `socket_proxy` from Compose |
-| 3 | `deploy-gluetun.yml` | Compose stack up |
-| 4 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
-| 5 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
-| 6 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
-| 7 | `deploy-homepage.yml` | — (last) |
+| 2 | `deploy-cloudflare-ddns.yml` | `CLOUDFLARE_API_TOKEN`, DDNS vars in `.env` |
+| 3 | `deploy-authelia.yml` | `traefik_network`, `socket_proxy` from Compose |
+| 4 | `deploy-gluetun.yml` | Compose stack up |
+| 5 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
+| 6 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
+| 7 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
+| 8 | `deploy-homepage.yml` | — (last) |
 
-Use `deploy-services.yml` to run steps 1–7 in this order automatically.
+Use `deploy-services.yml` to run steps 1–8 in this order automatically.
 
 ### Traefik configuration
 
@@ -97,6 +102,20 @@ Static config and the Authelia forward-auth middleware deploy to `services/traef
 Requires `DOMAIN`, `ACME_EMAIL`, and `CLOUDFLARE_API_TOKEN` in `.env`. Per-service router labels stay on each container in `compose.yaml`; protected routes reference the `authelia@file` middleware.
 
 `acme.json` is runtime data (certificate store) — never template or commit it.
+
+### Cloudflare DDNS
+
+Uses [favonia/cloudflare-ddns](https://github.com/favonia/cloudflare-ddns) with settings from `.env` (no config files on disk):
+
+| Variable | Purpose |
+| --- | --- |
+| `CLOUDFLARE_API_TOKEN` | Shared with Traefik ACME — needs DNS edit permissions |
+| `CLOUDFLARE_DDNS_DOMAINS` | Comma-separated records to update (e.g. `example.com,*.example.com`) |
+| `CLOUDFLARE_DDNS_PROXIED` | `true` / `false` — orange-cloud proxy |
+| `CLOUDFLARE_DDNS_DETECTION_MODE` | Public IP detection (`cloudflare.trace` recommended) |
+| `CLOUDFLARE_DDNS_HTTP_TIMEOUT` | HTTP timeout for IP detection |
+
+`deploy-cloudflare-ddns.yml` validates these vars and runs `docker compose up -d cloudflare-ddns`.
 
 ### Homepage configuration
 

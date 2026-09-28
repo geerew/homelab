@@ -5,16 +5,20 @@
 #   (creates service dirs, starts containers, and creates Docker networks)
 #
 # Order:
-#   1. Traefik       — static + dynamic config (Authelia forward-auth middleware)
-#   2. Authelia      — auth provider; resolves traefik_network / socket_proxy subnets
-#   3. Gluetun       — VPN gateway; Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent share its network
-#   4. Dispatcharr   — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
-#   5. qBittorrent   — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
-#   6. Jellyfin      — Live TV tuner registration requires Dispatcharr M3U to be populated
-#   7. Homepage      — service list + widgets reference the above (deploy last)
+#   1. Traefik          — static + dynamic config (Authelia forward-auth middleware)
+#   2. Cloudflare DDNS  — keeps DNS records pointed at this host
+#   3. Authelia         — auth provider; resolves traefik_network / socket_proxy subnets
+#   4. Gluetun          — VPN gateway; Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent share its network
+#   5. Dispatcharr      — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
+#   6. qBittorrent      — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
+#   7. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
+#   8. Homepage         — service list + widgets reference the above (deploy last)
 
 - name: Deploy Traefik
   ansible.builtin.import_playbook: deploy-traefik.yml
+
+- name: Deploy Cloudflare DDNS
+  ansible.builtin.import_playbook: deploy-cloudflare-ddns.yml
 
 - name: Deploy Authelia
   ansible.builtin.import_playbook: deploy-authelia.yml
