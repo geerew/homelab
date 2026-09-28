@@ -44,7 +44,14 @@
         mode: "0644"
       register: jellyfin_branding_config
 
-    - name: Render livetv.xml from template
+    - name: Check for existing livetv.xml
+      ansible.builtin.stat:
+        path: "{{ data_dir }}/services/jellyfin/config/config/livetv.xml"
+      register: jellyfin_livetv_stat
+
+    # Bootstrap only — Jellyfin rewrites livetv.xml at runtime (e.g. AllowHWTranscoding).
+    # Ongoing tuner config is applied via the Live TV API tasks below.
+    - name: Render livetv.xml from template when missing
       ansible.builtin.template:
         src: ../templates/jellyfin/livetv.xml.j2
         dest: "{{ data_dir }}/services/jellyfin/config/config/livetv.xml"
@@ -52,6 +59,7 @@
         group: "{{ homelab_env.PGID | default('1000') }}"
         mode: "0644"
       register: jellyfin_livetv_config
+      when: not jellyfin_livetv_stat.stat.exists
 
     - name: Restart Jellyfin to pick up config changes
       community.docker.docker_container:
@@ -60,7 +68,9 @@
         restart: true
       when:
         - not ansible_check_mode
-        - jellyfin_branding_config.changed or jellyfin_livetv_config.changed
+        - >-
+          jellyfin_branding_config.changed
+          or (jellyfin_livetv_config is defined and jellyfin_livetv_config.changed)
 
     - name: Wait for Jellyfin web UI after restart
       ansible.builtin.import_tasks: ../tasks/wait-for-http.yml
@@ -68,7 +78,9 @@
         wait_url: "http://127.0.0.1:8096/System/Info/Public"
       when:
         - not ansible_check_mode
-        - jellyfin_branding_config.changed or jellyfin_livetv_config.changed
+        - >-
+          jellyfin_branding_config.changed
+          or (jellyfin_livetv_config is defined and jellyfin_livetv_config.changed)
 
     - name: Remove legacy HDHomeRun tuner from Jellyfin
       ansible.builtin.uri:
@@ -196,8 +208,8 @@
           {% if ansible_check_mode %}
           Check mode: run without --check to render Jellyfin branding.xml and livetv.xml into
           {{ data_dir }}/services/jellyfin/config/config/.
-          {% elif jellyfin_branding_config.changed or jellyfin_livetv_config.changed %}
-          Deployed Jellyfin config{% if jellyfin_branding_config.changed %} (branding + CSS){% endif %}{% if jellyfin_livetv_config.changed %} (M3U tuner → {{ jellyfin_livetv_m3u_url }}){% endif %} and restarted Jellyfin.{% if jellyfin_livetv_config.changed %} Live TV channels re-imported from Dispatcharr with EPL / TNT / Sky section headers.{% endif %} Hard-refresh the browser after deploy.
+          {% elif jellyfin_branding_config.changed or (jellyfin_livetv_config is defined and jellyfin_livetv_config.changed) %}
+          Deployed Jellyfin config{% if jellyfin_branding_config.changed %} (branding + CSS){% endif %}{% if jellyfin_livetv_config is defined and jellyfin_livetv_config.changed %} (M3U tuner → {{ jellyfin_livetv_m3u_url }}){% endif %} and restarted Jellyfin.{% if jellyfin_livetv_config is defined and jellyfin_livetv_config.changed %} Live TV channels re-imported from Dispatcharr with EPL / TNT / Sky section headers.{% endif %} Hard-refresh the browser after deploy.
           {% else %}
           Jellyfin config unchanged — no restart needed.
           {% endif %}
