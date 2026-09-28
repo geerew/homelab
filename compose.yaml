@@ -275,7 +275,8 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-      - HOMEPAGE_ALLOWED_HOSTS=home.${DOMAIN},192.168.90.0/24
+      # Include homepage:3000 so Uptime Kuma (and other in-network HTTP checks) pass Host validation
+      - HOMEPAGE_ALLOWED_HOSTS=home.${DOMAIN},192.168.90.0/24,homepage:3000
       - DOCKER_HOST=tcp://socket-proxy:2375
     volumes:
       - ${DATA_DIR}/services/homepage/config:/app/config
