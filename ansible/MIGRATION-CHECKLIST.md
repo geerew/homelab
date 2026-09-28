@@ -24,15 +24,34 @@ Step through services one at a time until each has a `deploy-<service>.yml` play
 
 ```bash
 cd ansible
-ansible-playbook playbooks/site.yml              # dirs + docker compose up
-ansible-playbook playbooks/deploy-gluetun.yml    # VPN before *arr/qbit
-ansible-playbook playbooks/deploy-dispatcharr.yml
-ansible-playbook playbooks/deploy-qbittorrent.yml
-ansible-playbook playbooks/deploy-jellyfin.yml   # needs Dispatcharr M3U
-ansible-playbook playbooks/deploy-homepage.yml
-# Or all app playbooks:
-ansible-playbook playbooks/deploy-services.yml
+ansible-playbook playbooks/site.yml              # 1. dirs + docker compose up (prerequisite)
+ansible-playbook playbooks/deploy-services.yml   # 2. all app config in dependency order
 ```
+
+Or step through individually (same order as `deploy-services.yml`):
+
+```bash
+ansible-playbook playbooks/deploy-traefik.yml      # edge config; before Authelia middleware goes live
+ansible-playbook playbooks/deploy-authelia.yml     # auth; needs Docker networks from site.yml
+ansible-playbook playbooks/deploy-gluetun.yml      # VPN before *arr / qBittorrent
+ansible-playbook playbooks/deploy-dispatcharr.yml  # IPTV; before Jellyfin Live TV
+ansible-playbook playbooks/deploy-qbittorrent.yml  # WebUI on gluetun network
+ansible-playbook playbooks/deploy-jellyfin.yml     # M3U tuner → Dispatcharr
+ansible-playbook playbooks/deploy-homepage.yml     # widgets last
+```
+
+**Why order matters**
+
+| Playbook | Depends on |
+| --- | --- |
+| `site.yml` | — (run first: containers + `traefik_network` / `socket_proxy`) |
+| `deploy-traefik.yml` | `site.yml` |
+| `deploy-authelia.yml` | `site.yml` (subnet auto-detect) |
+| `deploy-gluetun.yml` | `site.yml` |
+| `deploy-dispatcharr.yml` | `site.yml` (Dispatcharr container on `:9191`; also ensures Gluetun stack is up) |
+| `deploy-qbittorrent.yml` | Gluetun running (shared network namespace) |
+| `deploy-jellyfin.yml` | Dispatcharr M3U populated at `http://dispatcharr:9191/output/m3u/` |
+| `deploy-homepage.yml` | Nothing hard — deploy last so widget URLs match live services |
 
 ---
 
@@ -40,9 +59,10 @@ ansible-playbook playbooks/deploy-services.yml
 
 | Service | Playbook | Fully configured? |
 | --- | --- | --- |
+| **Traefik** | `deploy-traefik.yml` | **Yes** — static config + Authelia forward-auth middleware; `acme.json` is runtime |
 | **Authelia** | `deploy-authelia.yml` | **Yes** — `users.yml` + `configuration.yml` templated; SQLite DB + notification log are auto-created at runtime (not Ansible todos) |
 | **Dispatcharr** | `deploy-dispatcharr.yml` | **Yes** — admin, M3U/XC provider, XC password, EPL/sports channel groups, auto channel sync |
-| **Gluetun** | `deploy-gluetun.yml` | **Mostly** — HTTP control-server auth is templated; VPN/Mullvad settings still live in `compose.yaml` env |
+| **Gluetun** | `deploy-gluetun.yml` | **Yes** — VPN settings in `.env`, HTTP control-server auth in `config.toml`; ports/Traefik labels stay in Compose |
 | **Jellyfin** | `deploy-jellyfin.yml` | **No** — Live TV + branding/CSS only; libraries, users, OIDC, transcoding, plugins still manual |
 | **qBittorrent** | `deploy-qbittorrent.yml` | **Mostly for WebUI** — port + LAN auth bypass; BitTorrent session prefs intentionally left to UI on existing installs |
 | **Homepage** | `deploy-homepage.yml` | **Mostly** — service list + widgets; `bookmarks.yaml` referenced but missing from `files/homepage/` |
@@ -63,6 +83,21 @@ ansible-playbook playbooks/deploy-services.yml
 ---
 
 ## Services with deploy playbooks
+
+### Traefik — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-traefik.yml` |
+| **In `deploy-services.yml`** | Yes (first) |
+| **Ansible sources** | `templates/traefik/traefik.yml.j2`, `templates/traefik/dynamic/authelia.yml.j2` |
+| **`.env` keys** | `DOMAIN`, `ACME_EMAIL`, `CLOUDFLARE_API_TOKEN` |
+| **Configured by Ansible** | Entrypoints, HTTP→HTTPS redirect, Docker + file providers, Cloudflare ACME resolver, Authelia `forwardAuth` middleware, dashboard route |
+| **Still in Compose only** | Per-service router labels, Kuma labels, image version, port 80/443 publish |
+| **Auto-managed at runtime (not Ansible)** | `acme.json` — Let's Encrypt certificates; created/renewed by Traefik |
+| **Fresh stand-up** | Set Traefik/DNS vars in `.env`, run `deploy-traefik.yml`, then `docker compose up -d traefik` |
+
+---
 
 ### Authelia — ✅
 
@@ -93,17 +128,18 @@ ansible-playbook playbooks/deploy-services.yml
 
 ---
 
-### Gluetun — 🟡
+### Gluetun — ✅
 
 | | |
 | --- | --- |
 | **Playbook** | `playbooks/deploy-gluetun.yml` |
 | **In `deploy-services.yml`** | Yes |
 | **Ansible sources** | `templates/gluetun/config.toml.j2` → `services/gluetun/config.toml` |
-| **`.env` keys** | `GLUETUN_API_KEY`, `WIREGUARD_PRIVATE_KEY` |
+| **`.env` keys** | VPN: `GLUETUN_API_KEY`, `VPN_*`, `WIREGUARD_*`, `SERVER_CITIES`, `GLUETUN_DOT`, `GLUETUN_DNS_ADDRESS`, `FIREWALL_OUTBOUND_SUBNETS`. Ports: `GLUETUN_PORT_*`, `SONARR_PORT`, `RADARR_PORT`, `PROWLARR_PORT`, `BAZARR_PORT`, `QBITTORRENT_WEBUI_PORT` |
 | **Configured by Ansible** | HTTP control-server API key roles (Homepage widget, local app routes) |
-| **Still outside Ansible** | VPN provider, server cities, wireguard addresses, firewall outbound subnets, port mappings — all in `compose.yaml` `environment:` |
-| **Next steps** | Template or `.env`-drive: `SERVER_CITIES`, `WIREGUARD_ADDRESSES`, `FIREWALL_OUTBOUND_SUBNETS`, port publish list; consider moving subnet to shared `.env` (used by qBittorrent LAN bypass too) |
+| **Configured via `.env` + Compose** | VPN provider, WireGuard creds, server cities, DNS, firewall outbound subnets |
+| **Still in Compose only** | Traefik/Kuma labels, HTTP proxy/control-server toggles (port *values* come from `.env`) |
+| **Fresh stand-up** | Fill Gluetun section in `.env`, run `deploy-gluetun.yml`, then `docker compose up -d gluetun` (or `site.yml`) |
 
 ---
 
@@ -157,7 +193,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 
 | Service | Compose only today | Config location | Suggested `deploy-*` scope |
 | --- | --- | --- | --- |
-| **Traefik** | ⬜ | `services/traefik/acme/acme.json`, labels in Compose | `deploy-traefik.yml` — dynamic middlewares, optional file provider configs; ACME stays runtime |
+| **Traefik** | ✅ | `services/traefik/traefik.yml`, `dynamic/authelia.yml`, `acme/acme.json` | `deploy-traefik.yml` — static + Authelia middleware; per-service routes stay on Compose labels |
 | **Authelia** | ✅ | `services/authelia/config/configuration.yml`, `users.yml` | `deploy-authelia.yml` — config done; `db.sqlite3` / `notification.txt` auto-created at runtime |
 | **Cloudflare DDNS** | ⬜ | Compose env | `deploy-cloudflare-ddns.yml` — likely env-only, low priority |
 | **Socket proxy** | ⬜ | Compose only | Skip — no app config |
@@ -205,9 +241,9 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 Work top-to-bottom; each step should leave the stack usable.
 
 1. **Authelia** — everything depends on SSO
-2. **Traefik** — only if moving labels/middlewares out of Compose
+2. ~~**Traefik**~~ — done (static + Authelia middleware in Ansible; service routes stay on Compose labels)
 3. **Homepage** — fix missing `bookmarks.yaml`; quick win
-4. **Gluetun** — move remaining VPN env into Ansible/templates
+4. ~~**Gluetun**~~ — done (VPN in `.env`, auth roles in Ansible)
 5. **Sonarr → Radarr → Prowlarr → Bazarr** — *arr chain; share patterns (API + `config.xml` snippets)
 6. **Seerr** — depends on Jellyfin + *arr
 7. **Jellyfin** — libraries, OIDC, encoding (biggest remaining gap)
@@ -240,7 +276,7 @@ Use this when starting a new `deploy-<service>.yml`:
 
 ## Notes
 
-- **Compose vs Ansible**: Traefik routes, Authelia middleware, Kuma labels, and image versions stay in `compose.yaml` for now. Ansible owns *application* config under `services/<app>/`.
+- **Compose vs Ansible**: Per-service Traefik router labels, Kuma labels, and image versions stay in `compose.yaml`. Ansible owns static Traefik config, Authelia middleware, and app config under `services/<app>/`.
 - **Gluetun sidecars**: Any playbook that recreates Gluetun should use `tasks/start-gluetun-stack.yml` so qBittorrent/Sonarr/Radarr/Prowlarr/Bazarr stay attached to the same network namespace.
 - **Dispatcharr ↔ Jellyfin**: Deploy Dispatcharr (M3U output) before Jellyfin Live TV.
 - **Homepage widget keys**: Many `HOMEPAGE_*_API_KEY` values are created in each app's UI — consider Ansible tasks that read/create API keys via each app's API during deploy.

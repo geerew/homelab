@@ -1,18 +1,35 @@
 ---
+# Deploy all application config playbooks in dependency order.
+#
+# Prerequisite: ansible-playbook playbooks/site.yml
+#   (creates service dirs, starts containers, and creates Docker networks)
+#
+# Order:
+#   1. Traefik       — static + dynamic config (Authelia forward-auth middleware)
+#   2. Authelia      — auth provider; resolves traefik_network / socket_proxy subnets
+#   3. Gluetun       — VPN gateway; Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent share its network
+#   4. Dispatcharr   — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
+#   5. qBittorrent   — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
+#   6. Jellyfin      — Live TV tuner registration requires Dispatcharr M3U to be populated
+#   7. Homepage      — service list + widgets reference the above (deploy last)
+
+- name: Deploy Traefik
+  ansible.builtin.import_playbook: deploy-traefik.yml
+
 - name: Deploy Authelia
   ansible.builtin.import_playbook: deploy-authelia.yml
-
-- name: Deploy Dispatcharr
-  ansible.builtin.import_playbook: deploy-dispatcharr.yml
 
 - name: Deploy Gluetun
   ansible.builtin.import_playbook: deploy-gluetun.yml
 
+- name: Deploy Dispatcharr
+  ansible.builtin.import_playbook: deploy-dispatcharr.yml
+
 - name: Deploy qBittorrent
   ansible.builtin.import_playbook: deploy-qbittorrent.yml
 
-- name: Deploy Homepage
-  ansible.builtin.import_playbook: deploy-homepage.yml
-
 - name: Deploy Jellyfin
   ansible.builtin.import_playbook: deploy-jellyfin.yml
+
+- name: Deploy Homepage
+  ansible.builtin.import_playbook: deploy-homepage.yml

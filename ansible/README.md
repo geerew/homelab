@@ -26,13 +26,14 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | --- | --- |
 | `playbooks/site.yml` | Ensure `services/` dirs + deploy the full Docker Compose stack |
 | `playbooks/ensure-service-dirs.yml` | Create `services/` directory tree only (no Compose) |
+| `playbooks/deploy-traefik.yml` | Render Traefik static config + Authelia forward-auth middleware |
 | `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from templates, `.env`, and vars |
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
 | `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
-| `playbooks/deploy-services.yml` | Authelia + Dispatcharr + Gluetun + qBittorrent + Homepage + Jellyfin |
+| `playbooks/deploy-services.yml` | All app deploy playbooks in dependency order (Traefik first — see below) |
 
 ## Usage
 
@@ -41,6 +42,9 @@ From the `ansible/` directory:
 ```bash
 # Deploy everything
 ansible-playbook playbooks/site.yml
+
+# Deploy Traefik static config + Authelia middleware
+ansible-playbook playbooks/deploy-traefik.yml
 
 # Deploy Authelia users + configuration
 ansible-playbook playbooks/deploy-authelia.yml
@@ -60,9 +64,39 @@ ansible-playbook playbooks/deploy-homepage.yml
 # Deploy Jellyfin config (custom CSS, M3U tuner, Live TV list layout)
 ansible-playbook playbooks/deploy-jellyfin.yml
 
-# Deploy all app services (Dispatcharr + Gluetun + Homepage + Jellyfin)
+# Deploy all app config (ordered: Traefik → Authelia → Gluetun → … → Homepage)
 ansible-playbook playbooks/deploy-services.yml
 ```
+
+Run `site.yml` before any deploy playbook — Traefik/Authelia need Docker networks, Jellyfin needs Dispatcharr running, qBittorrent needs Gluetun.
+
+### Deploy order
+
+| Step | Playbook | Waits on |
+| --- | --- | --- |
+| 0 | `site.yml` | — |
+| 1 | `deploy-traefik.yml` | Compose stack up |
+| 2 | `deploy-authelia.yml` | `traefik_network`, `socket_proxy` from Compose |
+| 3 | `deploy-gluetun.yml` | Compose stack up |
+| 4 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
+| 5 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
+| 6 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
+| 7 | `deploy-homepage.yml` | — (last) |
+
+Use `deploy-services.yml` to run steps 1–7 in this order automatically.
+
+### Traefik configuration
+
+Static config and the Authelia forward-auth middleware deploy to `services/traefik/` (gitignored):
+
+| File | Source |
+| --- | --- |
+| `traefik.yml` | [`templates/traefik/traefik.yml.j2`](templates/traefik/traefik.yml.j2) |
+| `dynamic/authelia.yml` | [`templates/traefik/dynamic/authelia.yml.j2`](templates/traefik/dynamic/authelia.yml.j2) |
+
+Requires `DOMAIN`, `ACME_EMAIL`, and `CLOUDFLARE_API_TOKEN` in `.env`. Per-service router labels stay on each container in `compose.yaml`; protected routes reference the `authelia@file` middleware.
+
+`acme.json` is runtime data (certificate store) — never template or commit it.
 
 ### Homepage configuration
 
@@ -87,9 +121,9 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
 | Traefik dashboard | `HOMEPAGE_TRAEFIK_USERNAME`, `HOMEPAGE_TRAEFIK_PASSWORD` |
 | Dispatcharr | `DISPATCHARR_ADMIN_*` |
-| Gluetun | `GLUETUN_API_KEY` |
+| Gluetun | `GLUETUN_API_KEY`, `VPN_SERVICE_PROVIDER`, `VPN_TYPE`, `WIREGUARD_*`, `SERVER_CITIES`, `GLUETUN_DNS_ADDRESS`, `FIREWALL_OUTBOUND_SUBNETS` |
 
-Gluetun `config.toml` is generated to `services/gluetun/config.toml` (gitignored) and bind-mounted into the container at `/gluetun/auth/config.toml`.
+Gluetun VPN settings are read from `.env` by Compose. Ansible renders `config.toml` to `services/gluetun/config.toml` (gitignored) for HTTP control-server auth roles (Homepage widget, local app routes).
 
 ### Authelia
 

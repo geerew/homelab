@@ -117,35 +117,9 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${DATA_DIR}/services/traefik/acme/acme.json:/acme.json
-    command:
-      - --entrypoints.traefik.address=:8080
-      - --entrypoints.web.address=:80
-      - --entrypoints.websecure.address=:443
-      - --ping=true
-      - --ping.entryPoint=traefik
-      - --api.dashboard=true
-      - --api.insecure=true
-      - --providers.docker=true
-      - --providers.docker.endpoint=tcp://socket-proxy:2375
-      - --providers.docker.exposedByDefault=false
-      - --providers.docker.network=traefik_network
-      - --entrypoints.web.http.redirections.entryPoint.to=websecure
-      - --entrypoints.web.http.redirections.entryPoint.scheme=https
-      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
-      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
-      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL}
-      - --certificatesresolvers.cloudflare.acme.storage=/acme.json
+      - ${DATA_DIR}/services/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ${DATA_DIR}/services/traefik/dynamic:/etc/traefik/dynamic:ro
     labels:
-      # Traefik
-      - traefik.enable=true
-      - traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/authz/forward-auth?rd=https://auth.${DOMAIN}/
-      - traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true
-      - traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Name,Remote-Email
-      - traefik.http.routers.traefik-dash.rule=Host(`traefik.${DOMAIN}`)
-      - traefik.http.routers.traefik-dash.service=api@internal
-      - traefik.http.routers.traefik-dash.entrypoints=websecure
-      - traefik.http.routers.traefik-dash.tls.certresolver=cloudflare
-      - traefik.http.routers.traefik-dash.middlewares=authelia
       # Kuma
       - kuma.traefik.http.name=Traefik
       - kuma.traefik.http.url=http://traefik:8080/ping
@@ -200,7 +174,7 @@ services:
       - traefik.http.routers.uptime.entrypoints=websecure
       - traefik.http.routers.uptime.tls=true
       - traefik.http.routers.uptime.tls.certresolver=cloudflare
-      - traefik.http.routers.uptime.middlewares=authelia@docker
+      - traefik.http.routers.uptime.middlewares=authelia@file
       - traefik.http.services.uptime.loadbalancer.server.port=3001
 
   autokuma:
@@ -248,7 +222,7 @@ services:
       - traefik.http.routers.dozzle.entrypoints=websecure
       - traefik.http.routers.dozzle.tls=true
       - traefik.http.routers.dozzle.tls.certresolver=cloudflare
-      - traefik.http.routers.dozzle.middlewares=authelia@docker
+      - traefik.http.routers.dozzle.middlewares=authelia@file
       - traefik.http.services.dozzle.loadbalancer.server.port=8080
       # Kuma (Docker host is socket-proxy via TCP)
       - kuma.dozzle.docker.name=Dozzle
@@ -309,7 +283,7 @@ services:
       - traefik.http.routers.homepage.entrypoints=websecure
       - traefik.http.routers.homepage.tls=true
       - traefik.http.routers.homepage.tls.certresolver=cloudflare
-      - traefik.http.routers.homepage.middlewares=authelia@docker
+      - traefik.http.routers.homepage.middlewares=authelia@file
       - traefik.http.services.homepage.loadbalancer.server.port=3000
       # Kuma
       - kuma.homepage.http.name=Homepage
@@ -385,7 +359,7 @@ services:
       - traefik.http.routers.jellyscope.entrypoints=websecure
       - traefik.http.routers.jellyscope.tls=true
       - traefik.http.routers.jellyscope.tls.certresolver=cloudflare
-      - traefik.http.routers.jellyscope.middlewares=authelia@docker
+      - traefik.http.routers.jellyscope.middlewares=authelia@file
       - traefik.http.services.jellyscope.loadbalancer.server.port=8097
       # Kuma
       - kuma.jellyscope.http.name=Jellyscope
@@ -636,7 +610,7 @@ services:
       - traefik.http.routers.seerr.entrypoints=websecure
       - traefik.http.routers.seerr.tls=true
       - traefik.http.routers.seerr.tls.certresolver=cloudflare
-      # - traefik.http.routers.seerr.middlewares=authelia@docker
+      # - traefik.http.routers.seerr.middlewares=authelia@file
       - traefik.http.services.seerr.loadbalancer.server.port=5055
       # Kuma
       - kuma.seerr.http.name=Seerr
@@ -653,25 +627,25 @@ services:
     volumes:
       - ${DATA_DIR}/services/gluetun/config.toml:/gluetun/auth/config.toml:ro
     environment:
-      - VPN_SERVICE_PROVIDER=mullvad
-      - VPN_TYPE=wireguard
+      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
+      - VPN_TYPE=${VPN_TYPE}
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
-      - WIREGUARD_ADDRESSES=10.69.39.234/32
-      - SERVER_CITIES=Gothenburg,Malmö,Stockholm
-      - DOT=off
-      - DNS_ADDRESS=10.64.0.1
+      - WIREGUARD_ADDRESSES=${WIREGUARD_ADDRESSES}
+      - SERVER_CITIES=${SERVER_CITIES}
+      - DOT=${GLUETUN_DOT:-off}
+      - DNS_ADDRESS=${GLUETUN_DNS_ADDRESS}
       - HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE={"auth":"apikey","apikey":"${GLUETUN_API_KEY}"}
       - HTTP_CONTROL_SERVER_ADDRESS=:8000
       - HTTP_CONTROL_SERVER_LOG=on
       - HTTPPROXY=on
-      - FIREWALL_OUTBOUND_SUBNETS=192.168.90.0/24
+      - FIREWALL_OUTBOUND_SUBNETS=${FIREWALL_OUTBOUND_SUBNETS}
     ports:
-      - 8888:8888/tcp
-      - 8080:8000/tcp
-      - 8989:8989/tcp
-      - 7878:7878/tcp
-      - 9696:9696/tcp
-      - ${QBITTORRENT_WEBUI_PORT:-9865}:${QBITTORRENT_WEBUI_PORT:-9865}/tcp
+      - ${GLUETUN_PORT_HTTPPROXY}:${GLUETUN_PORT_HTTPPROXY}/tcp
+      - ${GLUETUN_PORT_CONTROL_SERVER}:8000/tcp
+      - ${SONARR_PORT}:${SONARR_PORT}/tcp
+      - ${RADARR_PORT}:${RADARR_PORT}/tcp
+      - ${PROWLARR_PORT}:${PROWLARR_PORT}/tcp
+      - ${QBITTORRENT_WEBUI_PORT}:${QBITTORRENT_WEBUI_PORT}/tcp
     networks:
       - traefik_network
     restart: unless-stopped
@@ -685,44 +659,44 @@ services:
       - traefik.http.routers.gluetun-api.entrypoints=websecure
       - traefik.http.routers.gluetun-api.tls=true
       - traefik.http.routers.gluetun-api.tls.certresolver=cloudflare
-      - traefik.http.routers.gluetun-api.middlewares=authelia@docker
+      - traefik.http.routers.gluetun-api.middlewares=authelia@file
       - traefik.http.routers.gluetun-api.service=gluetun-api
       - traefik.http.services.gluetun-api.loadbalancer.server.port=8000
       - traefik.http.routers.qbittorrent.rule=Host(`torrents.${DOMAIN}`)
       - traefik.http.routers.qbittorrent.entrypoints=websecure
       - traefik.http.routers.qbittorrent.tls=true
       - traefik.http.routers.qbittorrent.tls.certresolver=cloudflare
-      - traefik.http.routers.qbittorrent.middlewares=authelia@docker
+      - traefik.http.routers.qbittorrent.middlewares=authelia@file
       - traefik.http.routers.qbittorrent.service=qbittorrent-service
-      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=${QBITTORRENT_WEBUI_PORT:-9865}
+      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=${QBITTORRENT_WEBUI_PORT}
       - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)
       - traefik.http.routers.sonarr.entrypoints=websecure
       - traefik.http.routers.sonarr.tls=true
       - traefik.http.routers.sonarr.tls.certresolver=cloudflare
-      - traefik.http.routers.sonarr.middlewares=authelia@docker
+      - traefik.http.routers.sonarr.middlewares=authelia@file
       - traefik.http.routers.sonarr.service=sonarr-service
-      - traefik.http.services.sonarr-service.loadbalancer.server.port=8989
+      - traefik.http.services.sonarr-service.loadbalancer.server.port=${SONARR_PORT}
       - traefik.http.routers.radarr.rule=Host(`radarr.${DOMAIN}`)
       - traefik.http.routers.radarr.entrypoints=websecure
       - traefik.http.routers.radarr.tls=true
       - traefik.http.routers.radarr.tls.certresolver=cloudflare
-      - traefik.http.routers.radarr.middlewares=authelia@docker
+      - traefik.http.routers.radarr.middlewares=authelia@file
       - traefik.http.routers.radarr.service=radarr-service
-      - traefik.http.services.radarr-service.loadbalancer.server.port=7878
+      - traefik.http.services.radarr-service.loadbalancer.server.port=${RADARR_PORT}
       - traefik.http.routers.prowlarr.rule=Host(`prowlarr.${DOMAIN}`)
       - traefik.http.routers.prowlarr.entrypoints=websecure
       - traefik.http.routers.prowlarr.tls=true
       - traefik.http.routers.prowlarr.tls.certresolver=cloudflare
-      - traefik.http.routers.prowlarr.middlewares=authelia@docker
+      - traefik.http.routers.prowlarr.middlewares=authelia@file
       - traefik.http.routers.prowlarr.service=prowlarr-service
-      - traefik.http.services.prowlarr-service.loadbalancer.server.port=9696
+      - traefik.http.services.prowlarr-service.loadbalancer.server.port=${PROWLARR_PORT}
       - traefik.http.routers.bazarr.rule=Host(`bazarr.${DOMAIN}`)
       - traefik.http.routers.bazarr.entrypoints=websecure
       - traefik.http.routers.bazarr.tls=true
       - traefik.http.routers.bazarr.tls.certresolver=cloudflare
-      - traefik.http.routers.bazarr.middlewares=authelia@docker
+      - traefik.http.routers.bazarr.middlewares=authelia@file
       - traefik.http.routers.bazarr.service=bazarr-service
-      - traefik.http.services.bazarr-service.loadbalancer.server.port=6767
+      - traefik.http.services.bazarr-service.loadbalancer.server.port=${BAZARR_PORT}
       # Kuma
       - kuma.vpn.port.name=VPN Gateway
       - kuma.vpn.port.hostname=gluetun
@@ -736,7 +710,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT:-9865}
+      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT}
     volumes:
       - ${DATA_DIR}/services/qbittorrent/config:/config
       - ${DOWNLOADS_DIR}:/downloads
@@ -746,7 +720,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma
       - kuma.qbittorrent.http.name=qBittorrent
-      - kuma.qbittorrent.http.url=http://gluetun:${QBITTORRENT_WEBUI_PORT:-9865}/api/v2/app/version
+      - kuma.qbittorrent.http.url=http://gluetun:${QBITTORRENT_WEBUI_PORT}/api/v2/app/version
 
   sonarr:
     image: ghcr.io/linuxserver/sonarr:latest
@@ -769,7 +743,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma (override KUMA_SONARR_URL in .env if /ping not supported)
       - kuma.sonarr.http.name=Sonarr
-      - kuma.sonarr.http.url=${KUMA_SONARR_URL:-http://gluetun:8989/ping}
+      - kuma.sonarr.http.url=${KUMA_SONARR_URL:-http://gluetun:${SONARR_PORT}/ping}
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -792,7 +766,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma
       - kuma.radarr.http.name=Radarr
-      - kuma.radarr.http.url=${KUMA_RADARR_URL:-http://gluetun:7878/ping}
+      - kuma.radarr.http.url=${KUMA_RADARR_URL:-http://gluetun:${RADARR_PORT}/ping}
 
   prowlarr:
     image: ghcr.io/linuxserver/prowlarr:latest
@@ -812,7 +786,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma
       - kuma.prowlarr.http.name=Prowlarr
-      - kuma.prowlarr.http.url=${KUMA_PROWLARR_URL:-http://gluetun:9696/ping}
+      - kuma.prowlarr.http.url=${KUMA_PROWLARR_URL:-http://gluetun:${PROWLARR_PORT}/ping}
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
@@ -834,7 +808,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma
       - kuma.bazarr.http.name=Bazarr
-      - kuma.bazarr.http.url=${KUMA_BAZARR_URL:-http://gluetun:6767/api/system/status}
+      - kuma.bazarr.http.url=${KUMA_BAZARR_URL:-http://gluetun:${BAZARR_PORT}/api/system/status}
 
   dispatcharr:
     image: ghcr.io/dispatcharr/dispatcharr:latest
@@ -871,7 +845,7 @@ services:
       - traefik.http.routers.dispatcharr.entrypoints=websecure
       - traefik.http.routers.dispatcharr.tls=true
       - traefik.http.routers.dispatcharr.tls.certresolver=cloudflare
-      - traefik.http.routers.dispatcharr.middlewares=authelia@docker
+      - traefik.http.routers.dispatcharr.middlewares=authelia@file
       - traefik.http.routers.dispatcharr.priority=1
       - traefik.http.routers.dispatcharr.service=dispatcharr-service
       # XC API for IPTV clients — no Authelia; Dispatcharr validates username + XC password

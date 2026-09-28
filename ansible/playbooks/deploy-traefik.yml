@@ -1,0 +1,83 @@
+---
+- name: Deploy Traefik
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Traefik settings in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DOMAIN is defined
+          - homelab_env.DOMAIN | length > 0
+          - homelab_env.ACME_EMAIL is defined
+          - homelab_env.ACME_EMAIL | length > 0
+          - homelab_env.CLOUDFLARE_API_TOKEN is defined
+          - homelab_env.CLOUDFLARE_API_TOKEN | length > 0
+        fail_msg: >-
+          Set DOMAIN, ACME_EMAIL, and CLOUDFLARE_API_TOKEN in {{ env_file }} (see .env.example).
+      when: not ansible_check_mode
+
+    - name: Ensure Traefik config directories exist
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/traefik/{{ item }}"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+      loop:
+        - acme
+        - dynamic
+
+    - name: Check for existing acme.json
+      ansible.builtin.stat:
+        path: "{{ data_dir }}/services/traefik/acme/acme.json"
+      register: traefik_acme_stat
+
+    - name: Fix acme.json permissions when present
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/traefik/acme/acme.json"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0600"
+      when: traefik_acme_stat.stat.exists
+
+    - name: Render Traefik static config
+      ansible.builtin.template:
+        src: ../templates/traefik/traefik.yml.j2
+        dest: "{{ data_dir }}/services/traefik/traefik.yml"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      register: traefik_static_config
+
+    - name: Render Traefik dynamic Authelia config
+      ansible.builtin.template:
+        src: ../templates/traefik/dynamic/authelia.yml.j2
+        dest: "{{ data_dir }}/services/traefik/dynamic/authelia.yml"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      register: traefik_dynamic_config
+
+    - name: Restart Traefik to pick up config changes
+      ansible.builtin.command:
+        cmd: docker compose restart traefik
+        chdir: "{{ homelab_dir }}"
+      when:
+        - not ansible_check_mode
+        - traefik_static_config.changed or traefik_dynamic_config.changed
+
+    - name: Report Traefik deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to render Traefik config.
+          {% elif traefik_static_config.changed or traefik_dynamic_config.changed %}
+          Deployed Traefik config to {{ data_dir }}/services/traefik/ and restarted Traefik.
+          {% else %}
+          Traefik config unchanged — no restart needed.
+          {% endif %}

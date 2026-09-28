@@ -8,14 +8,30 @@
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Gluetun API key in .env
+    - name: Validate Gluetun settings in .env
       ansible.builtin.assert:
         that:
           - homelab_env.GLUETUN_API_KEY is defined
           - homelab_env.GLUETUN_API_KEY | length > 0
+          - homelab_env.VPN_SERVICE_PROVIDER is defined
+          - homelab_env.VPN_SERVICE_PROVIDER | length > 0
+          - homelab_env.VPN_TYPE is defined
+          - homelab_env.VPN_TYPE | length > 0
+          - homelab_env.WIREGUARD_PRIVATE_KEY is defined
+          - homelab_env.WIREGUARD_PRIVATE_KEY | length > 0
+          - homelab_env.WIREGUARD_ADDRESSES is defined
+          - homelab_env.WIREGUARD_ADDRESSES | length > 0
+          - homelab_env.SERVER_CITIES is defined
+          - homelab_env.SERVER_CITIES | length > 0
+          - homelab_env.GLUETUN_DNS_ADDRESS is defined
+          - homelab_env.GLUETUN_DNS_ADDRESS | length > 0
+          - homelab_env.FIREWALL_OUTBOUND_SUBNETS is defined
+          - homelab_env.FIREWALL_OUTBOUND_SUBNETS | length > 0
         fail_msg: >-
-          Set GLUETUN_API_KEY in {{ env_file }}.
-          Generate with: docker run --rm qmcgaw/gluetun genkey
+          Set Gluetun VPN variables in {{ env_file }} (see .env.example):
+          GLUETUN_API_KEY, VPN_SERVICE_PROVIDER, VPN_TYPE, WIREGUARD_PRIVATE_KEY,
+          WIREGUARD_ADDRESSES, SERVER_CITIES, GLUETUN_DNS_ADDRESS, FIREWALL_OUTBOUND_SUBNETS.
+      when: not ansible_check_mode
 
     - name: Ensure Gluetun config directory exists
       ansible.builtin.file:
