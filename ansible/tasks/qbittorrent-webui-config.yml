@@ -1,0 +1,128 @@
+---
+- name: Set qBittorrent LAN auth bypass enabled fact
+  ansible.builtin.set_fact:
+    qbittorrent_lan_auth_bypass: "{{ homelab_env.QBITTORRENT_LAN_AUTH_BYPASS | default('true') | bool }}"
+
+- name: Validate qBittorrent WebUI credentials in .env
+  ansible.builtin.assert:
+    that:
+      - homelab_env.QBITTORRENT_WEBUI_USERNAME is defined
+      - homelab_env.QBITTORRENT_WEBUI_USERNAME | length > 0
+      - homelab_env.QBITTORRENT_WEBUI_PASSWORD is defined
+      - homelab_env.QBITTORRENT_WEBUI_PASSWORD | length > 0
+    fail_msg: >-
+      Set QBITTORRENT_WEBUI_USERNAME and QBITTORRENT_WEBUI_PASSWORD in {{ env_file }}.
+      Required for Sonarr/Radarr/Prowlarr download-client API access (see .env.example).
+  when: not ansible_check_mode
+
+- name: Resolve qBittorrent WebUI password PBKDF2 hash
+  check_mode: false
+  ansible.builtin.shell: |
+    python3 <<'PY'
+    import base64
+    import hashlib
+    import json
+    import pathlib
+    import re
+    import os
+
+    password = os.environ["PASSWORD"]
+    conf_path = pathlib.Path(os.environ["CONF_PATH"])
+
+    existing = ""
+    if conf_path.is_file():
+        match = re.search(
+            r'^WebUI\\Password_PBKDF2="(@ByteArray\([^"]+\))"',
+            conf_path.read_text(),
+            re.MULTILINE,
+        )
+        if match:
+            existing = match.group(1)
+
+    def verify(stored: str, plain: str) -> bool:
+        inner = stored.removeprefix("@ByteArray(").removesuffix(")")
+        salt_b64, key_b64 = inner.split(":", 1)
+        salt = base64.b64decode(salt_b64)
+        expected = base64.b64decode(key_b64)
+        actual = hashlib.pbkdf2_hmac("sha512", plain.encode(), salt, 100000, dklen=64)
+        return actual == expected
+
+    def generate(plain: str) -> str:
+        salt = os.urandom(16)
+        key = hashlib.pbkdf2_hmac("sha512", plain.encode(), salt, 100000, dklen=64)
+        return (
+            f"@ByteArray({base64.b64encode(salt).decode()}:"
+            f"{base64.b64encode(key).decode()})"
+        )
+
+    if existing and verify(existing, password):
+        value = existing
+    else:
+        value = generate(password)
+
+    print(json.dumps(value))
+    PY
+  environment:
+    PASSWORD: "{{ homelab_env.QBITTORRENT_WEBUI_PASSWORD }}"
+    CONF_PATH: "{{ data_dir }}/services/qbittorrent/config/qBittorrent/qBittorrent.conf"
+  register: qbittorrent_password_hash
+  changed_when: false
+  no_log: true
+
+- name: Set qBittorrent WebUI password fact
+  ansible.builtin.set_fact:
+    qbittorrent_webui_password_pbkdf2: "{{ qbittorrent_password_hash.stdout | from_json }}"
+
+- name: Inspect traefik_network subnet
+  check_mode: false
+  ansible.builtin.command:
+    cmd: docker network inspect traefik_network --format '{{ "{{" }} (index .IPAM.Config 0).Subnet {{ "}}" }}'
+  register: qbittorrent_traefik_subnet
+  changed_when: false
+  failed_when: false
+  when: qbittorrent_lan_auth_bypass
+
+- name: Read traefik_network subnet from compose.yaml when network is missing
+  check_mode: false
+  ansible.builtin.shell: |
+    python3 <<'PY'
+    import pathlib
+    import re
+
+    compose = pathlib.Path("{{ homelab_dir }}/compose.yaml").read_text()
+    match = re.search(
+        r"traefik_network:.*?subnet:\s*([0-9./]+)",
+        compose,
+        re.DOTALL,
+    )
+    print(match.group(1) if match else "")
+    PY
+  register: qbittorrent_compose_subnet
+  changed_when: false
+  when:
+    - qbittorrent_lan_auth_bypass
+    - qbittorrent_traefik_subnet.rc != 0 or (qbittorrent_traefik_subnet.stdout | trim) == ""
+
+- name: Set qBittorrent LAN auth bypass facts
+  ansible.builtin.set_fact:
+    qbittorrent_auth_subnet_enabled: "{{ qbittorrent_lan_auth_bypass }}"
+    qbittorrent_auth_subnet: >-
+      {{
+        (
+          qbittorrent_traefik_subnet.stdout | default('') | trim
+          if (qbittorrent_traefik_subnet.stdout | default('') | trim) | length > 0
+          else qbittorrent_compose_subnet.stdout | default('') | trim
+        )
+        if qbittorrent_lan_auth_bypass
+        else ''
+      }}
+
+- name: Fail when LAN auth bypass is enabled but subnet could not be resolved
+  ansible.builtin.fail:
+    msg: >-
+      QBITTORRENT_LAN_AUTH_BYPASS is true but traefik_network subnet could not be resolved.
+      Deploy the compose stack first (site.yml) or create traefik_network.
+  when:
+    - not ansible_check_mode
+    - qbittorrent_auth_subnet_enabled
+    - qbittorrent_auth_subnet | length == 0

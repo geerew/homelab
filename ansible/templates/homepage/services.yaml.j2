@@ -40,7 +40,7 @@
         container: qbittorrent
         widget:
           type: qbittorrent
-          url: http://gluetun:9865
+          url: http://gluetun:{{ homelab_env.QBITTORRENT_WEBUI_PORT | default('9865') }}
 
     - Mealie:
         icon: sh-mealie

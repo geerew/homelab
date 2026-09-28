@@ -671,7 +671,7 @@ services:
       - 8989:8989/tcp
       - 7878:7878/tcp
       - 9696:9696/tcp
-      - 9865:9865/tcp
+      - ${QBITTORRENT_WEBUI_PORT:-9865}:${QBITTORRENT_WEBUI_PORT:-9865}/tcp
     networks:
       - traefik_network
     restart: unless-stopped
@@ -694,7 +694,7 @@ services:
       - traefik.http.routers.qbittorrent.tls.certresolver=cloudflare
       - traefik.http.routers.qbittorrent.middlewares=authelia@docker
       - traefik.http.routers.qbittorrent.service=qbittorrent-service
-      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=9865
+      - traefik.http.services.qbittorrent-service.loadbalancer.server.port=${QBITTORRENT_WEBUI_PORT:-9865}
       - traefik.http.routers.sonarr.rule=Host(`sonarr.${DOMAIN}`)
       - traefik.http.routers.sonarr.entrypoints=websecure
       - traefik.http.routers.sonarr.tls=true
@@ -736,7 +736,7 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-      - WEBUI_PORT=9865
+      - WEBUI_PORT=${QBITTORRENT_WEBUI_PORT:-9865}
     volumes:
       - ${DATA_DIR}/services/qbittorrent/config:/config
       - ${DOWNLOADS_DIR}:/downloads
@@ -746,7 +746,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma
       - kuma.qbittorrent.http.name=qBittorrent
-      - kuma.qbittorrent.http.url=http://gluetun:9865/api/v2/app/version
+      - kuma.qbittorrent.http.url=http://gluetun:${QBITTORRENT_WEBUI_PORT:-9865}/api/v2/app/version
 
   sonarr:
     image: ghcr.io/linuxserver/sonarr:latest

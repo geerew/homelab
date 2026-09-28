@@ -2,6 +2,8 @@
 
 Ansible playbooks for deploying and bootstrapping the homelab stack. **Secrets stay in `.env`** (gitignored); nothing sensitive is stored in this directory.
 
+For a per-service migration tracker (what's done, what's todo, suggested order), see **[MIGRATION-CHECKLIST.md](MIGRATION-CHECKLIST.md)**.
+
 ## Prerequisites
 
 ```bash
@@ -24,12 +26,13 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | --- | --- |
 | `playbooks/site.yml` | Ensure `services/` dirs + deploy the full Docker Compose stack |
 | `playbooks/ensure-service-dirs.yml` | Create `services/` directory tree only (no Compose) |
+| `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` from `authelia-users.yml` |
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
-| `playbooks/bootstrap-dispatcharr.yml` | Alias for `deploy-dispatcharr.yml` |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
+| `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
 | `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
-| `playbooks/deploy-services.yml` | Dispatcharr + Gluetun + Homepage + Jellyfin |
+| `playbooks/deploy-services.yml` | Authelia + Dispatcharr + Gluetun + qBittorrent + Homepage + Jellyfin |
 
 ## Usage
 
@@ -39,11 +42,17 @@ From the `ansible/` directory:
 # Deploy everything
 ansible-playbook playbooks/site.yml
 
+# Deploy Authelia users (from authelia-users.yml)
+ansible-playbook playbooks/deploy-authelia.yml
+
 # Deploy Dispatcharr (admin + M3U provider + EPL/sports channels)
 ansible-playbook playbooks/deploy-dispatcharr.yml
 
 # Deploy Gluetun auth config (API key from .env)
 ansible-playbook playbooks/deploy-gluetun.yml
+
+# Deploy qBittorrent WebUI settings (port + LAN auth bypass from .env)
+ansible-playbook playbooks/deploy-qbittorrent.yml
 
 # Deploy Homepage config (widget creds/keys from .env)
 ansible-playbook playbooks/deploy-homepage.yml
@@ -81,6 +90,46 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Gluetun | `GLUETUN_API_KEY` |
 
 Gluetun `config.toml` is generated to `services/gluetun/config.toml` (gitignored) and bind-mounted into the container at `/gluetun/auth/config.toml`.
+
+### Authelia users
+
+User accounts are defined in `authelia-users.yml` at the repo root (gitignored). Copy from `authelia-users.example.yml`:
+
+```yaml
+users:
+  mike:
+    display_name: Mike
+    email: mike@example.com
+    password: your-plain-password
+    groups:
+      - admins
+```
+
+Use `password:` for plain text (Ansible hashes with argon2 at deploy time), or `password_hash:` to keep an existing hash until you set a new password. Deploy renders `services/authelia/config/users.yml` (gitignored). Do not edit `users.yml` directly — changes will be overwritten on the next deploy.
+
+```bash
+ansible-playbook playbooks/deploy-authelia.yml
+docker compose restart authelia   # optional if playbook did not restart
+```
+
+### qBittorrent WebUI
+
+WebUI credentials, port, and LAN auth bypass are managed from `.env` and applied to `services/qbittorrent/config/qBittorrent/qBittorrent.conf` (gitignored).
+
+| Setting | `.env` variable |
+| --- | --- |
+| Username | `QBITTORRENT_WEBUI_USERNAME` — used by Sonarr/Radarr/Prowlarr download-client API |
+| Password | `QBITTORRENT_WEBUI_PASSWORD` (PBKDF2 hash generated at deploy) |
+| WebUI port | `QBITTORRENT_WEBUI_PORT` |
+| LAN auth bypass | `QBITTORRENT_LAN_AUTH_BYPASS` |
+
+**Username/password are always required.** Sonarr, Radarr, and Prowlarr run on the Gluetun network and connect to qBittorrent's API with these credentials — they are not covered by the subnet whitelist.
+
+When `QBITTORRENT_LAN_AUTH_BYPASS=true` (default): Traefik and Homepage (on `traefik_network`) skip the WebUI login prompt; external browser access still goes through Authelia. When `false`, every WebUI request also requires qBittorrent credentials.
+
+The playbook backs up the live config to `qBittorrent.conf.bak` before changes. A snapshot of your pre-Ansible config is kept at [`files/qbittorrent/qBittorrent.conf.backup`](files/qbittorrent/qBittorrent.conf.backup).
+
+On an **existing** install, deploy only updates WebUI auth keys (username, password, port, whitelist) so other preferences changed in the qBittorrent UI are preserved. On a **fresh** install, the full baseline config is rendered from [`templates/qbittorrent/qBittorrent.conf.j2`](templates/qbittorrent/qBittorrent.conf.j2).
 
 ### Jellyfin branding
 

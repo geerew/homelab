@@ -1,0 +1,29 @@
+---
+- name: Resolve Authelia users file path
+  ansible.builtin.set_fact:
+    authelia_users_file: "{{ homelab_env.AUTHELIA_USERS_FILE | default(homelab_dir + '/authelia-users.yml') }}"
+
+- name: Check Authelia users file exists
+  ansible.builtin.stat:
+    path: "{{ authelia_users_file }}"
+  register: authelia_users_file_stat
+
+- name: Fail when Authelia users file is missing
+  ansible.builtin.fail:
+    msg: >-
+      Create {{ authelia_users_file }} from authelia-users.example.yml before running
+      deploy-authelia.yml.
+  when: not authelia_users_file_stat.stat.exists
+
+- name: Load Authelia users source file
+  ansible.builtin.include_vars:
+    file: "{{ authelia_users_file }}"
+    name: authelia_users_source
+
+- name: Validate Authelia users source structure
+  ansible.builtin.assert:
+    that:
+      - authelia_users_source.users is defined
+      - authelia_users_source.users | length > 0
+    fail_msg: "{{ authelia_users_file }} must define a non-empty users: map."
+  when: not ansible_check_mode

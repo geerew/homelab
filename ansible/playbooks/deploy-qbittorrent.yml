@@ -1,0 +1,94 @@
+---
+- name: Deploy qBittorrent
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - ansible.builtin.import_tasks: ../tasks/qbittorrent-webui-config.yml
+
+    - name: Build qBittorrent WebUI settings to apply
+      ansible.builtin.set_fact:
+        qbittorrent_webui_settings:
+          - key: 'WebUI\Username'
+            value: "{{ homelab_env.QBITTORRENT_WEBUI_USERNAME }}"
+          - key: 'WebUI\Password_PBKDF2'
+            value: '"{{ qbittorrent_webui_password_pbkdf2 }}"'
+          - key: 'WebUI\Port'
+            value: "{{ homelab_env.QBITTORRENT_WEBUI_PORT | default('9865') }}"
+          - key: 'WebUI\AuthSubnetWhitelist'
+            value: "{{ qbittorrent_auth_subnet }}"
+          - key: 'WebUI\AuthSubnetWhitelistEnabled'
+            value: "{{ qbittorrent_auth_subnet_enabled | string | lower }}"
+
+    - name: Ensure qBittorrent config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/qbittorrent/config/qBittorrent"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Check for existing qBittorrent.conf
+      ansible.builtin.stat:
+        path: "{{ data_dir }}/services/qbittorrent/config/qBittorrent/qBittorrent.conf"
+      register: qbittorrent_conf_stat
+
+    - name: Back up existing qBittorrent.conf before changes
+      ansible.builtin.copy:
+        src: "{{ data_dir }}/services/qbittorrent/config/qBittorrent/qBittorrent.conf"
+        dest: "{{ data_dir }}/services/qbittorrent/config/qBittorrent/qBittorrent.conf.bak"
+        remote_src: true
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      when: qbittorrent_conf_stat.stat.exists
+
+    - name: Render qBittorrent.conf from template when missing
+      ansible.builtin.template:
+        src: ../templates/qbittorrent/qBittorrent.conf.j2
+        dest: "{{ data_dir }}/services/qbittorrent/config/qBittorrent/qBittorrent.conf"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      register: qbittorrent_conf_rendered
+      no_log: true
+      when: not qbittorrent_conf_stat.stat.exists
+
+    - name: Apply qBittorrent WebUI settings to existing config
+      ansible.builtin.lineinfile:
+        path: "{{ data_dir }}/services/qbittorrent/config/qBittorrent/qBittorrent.conf"
+        regexp: "^{{ item.key | regex_escape }}="
+        line: "{{ item.key }}={{ item.value }}"
+        insertafter: '^\[Preferences\]'
+      loop: "{{ qbittorrent_webui_settings }}"
+      register: qbittorrent_conf_patched
+      no_log: true
+      when: qbittorrent_conf_stat.stat.exists
+
+    - name: Restart qBittorrent to pick up config changes
+      community.docker.docker_container:
+        name: qbittorrent
+        state: started
+        restart: true
+      when:
+        - not ansible_check_mode
+        - >-
+          qbittorrent_conf_rendered.changed
+          or (qbittorrent_conf_patched.results | default([]) | selectattr('changed') | list | length > 0)
+
+    - name: Report qBittorrent deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to apply qBittorrent WebUI settings.
+          {% elif qbittorrent_conf_rendered.changed %}
+          Rendered {{ data_dir }}/services/qbittorrent/config/qBittorrent/qBittorrent.conf and restarted qBittorrent.
+          {% elif qbittorrent_conf_patched.results | default([]) | selectattr('changed') | list | length > 0 %}
+          Updated qBittorrent WebUI settings in qBittorrent.conf and restarted qBittorrent.
+          {% else %}
+          qBittorrent WebUI settings unchanged — no restart needed.
+          {% endif %}

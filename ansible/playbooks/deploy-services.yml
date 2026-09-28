@@ -1,9 +1,15 @@
 ---
+- name: Deploy Authelia
+  ansible.builtin.import_playbook: deploy-authelia.yml
+
 - name: Deploy Dispatcharr
   ansible.builtin.import_playbook: deploy-dispatcharr.yml
 
 - name: Deploy Gluetun
   ansible.builtin.import_playbook: deploy-gluetun.yml
+
+- name: Deploy qBittorrent
+  ansible.builtin.import_playbook: deploy-qbittorrent.yml
 
 - name: Deploy Homepage
   ansible.builtin.import_playbook: deploy-homepage.yml

@@ -1,0 +1,65 @@
+---
+- name: Deploy Authelia
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+    - ansible.builtin.import_tasks: ../tasks/load-authelia-users.yml
+
+  tasks:
+    - ansible.builtin.import_tasks: ../tasks/authelia-resolve-password-hashes.yml
+
+    - name: Ensure Authelia config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/authelia/config"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Check for existing Authelia users.yml
+      ansible.builtin.stat:
+        path: "{{ data_dir }}/services/authelia/config/users.yml"
+      register: authelia_users_dest_stat
+
+    - name: Back up existing Authelia users.yml before changes
+      ansible.builtin.copy:
+        src: "{{ data_dir }}/services/authelia/config/users.yml"
+        dest: "{{ data_dir }}/services/authelia/config/users.yml.bak"
+        remote_src: true
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      when: authelia_users_dest_stat.stat.exists
+
+    - name: Render Authelia users.yml from template
+      ansible.builtin.template:
+        src: ../templates/authelia/users.yml.j2
+        dest: "{{ data_dir }}/services/authelia/config/users.yml"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0644"
+      register: authelia_users_config
+      no_log: true
+
+    - name: Restart Authelia to pick up users.yml changes
+      community.docker.docker_container:
+        name: authelia
+        state: started
+        restart: true
+      when:
+        - not ansible_check_mode
+        - authelia_users_config.changed
+
+    - name: Report Authelia deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to render Authelia users.yml.
+          {% elif authelia_users_config.changed %}
+          Deployed {{ data_dir }}/services/authelia/config/users.yml from {{ authelia_users_file }} and restarted Authelia.
+          {% else %}
+          Authelia users.yml unchanged — no restart needed.
+          {% endif %}
