@@ -8,9 +8,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_POLL_INTERVAL=86400
-      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_CLEANUP=${WATCHTOWER_CLEANUP}
+      - WATCHTOWER_POLL_INTERVAL=${WATCHTOWER_POLL_INTERVAL}
+      - WATCHTOWER_LABEL_ENABLE=${WATCHTOWER_LABEL_ENABLE}
       - TZ=${TZ}
     labels:
       # Kuma (Docker host is socket-proxy via TCP)
@@ -60,34 +60,34 @@ services:
     tmpfs:
       - /run
     environment:
-      - LOG_LEVEL=warning
-      - ALLOW_START=1
-      - ALLOW_STOP=1
-      - ALLOW_RESTARTS=1
-      - EVENTS=1
-      - PING=1
-      - VERSION=1
-      - AUTH=0
-      - SECRETS=0
-      - POST=1
-      - BUILD=0
-      - COMMIT=0
-      - CONFIGS=0
-      - CONTAINERS=1
-      - DISTRIBUTION=0
-      - EXEC=0
-      - IMAGES=1
-      - INFO=1
-      - NETWORKS=1
-      - NODES=0
-      - PLUGINS=0
-      - SERVICES=1
-      - SESSION=0
-      - SWARM=0
-      - SYSTEM=0
-      - TASKS=1
-      - VOLUMES=1
-      - DISABLE_IPV6=0
+      - LOG_LEVEL=${SOCKET_PROXY_LOG_LEVEL}
+      - ALLOW_START=${SOCKET_PROXY_ALLOW_START}
+      - ALLOW_STOP=${SOCKET_PROXY_ALLOW_STOP}
+      - ALLOW_RESTARTS=${SOCKET_PROXY_ALLOW_RESTARTS}
+      - EVENTS=${SOCKET_PROXY_EVENTS}
+      - PING=${SOCKET_PROXY_PING}
+      - VERSION=${SOCKET_PROXY_VERSION}
+      - AUTH=${SOCKET_PROXY_AUTH}
+      - SECRETS=${SOCKET_PROXY_SECRETS}
+      - POST=${SOCKET_PROXY_POST}
+      - BUILD=${SOCKET_PROXY_BUILD}
+      - COMMIT=${SOCKET_PROXY_COMMIT}
+      - CONFIGS=${SOCKET_PROXY_CONFIGS}
+      - CONTAINERS=${SOCKET_PROXY_CONTAINERS}
+      - DISTRIBUTION=${SOCKET_PROXY_DISTRIBUTION}
+      - EXEC=${SOCKET_PROXY_EXEC}
+      - IMAGES=${SOCKET_PROXY_IMAGES}
+      - INFO=${SOCKET_PROXY_INFO}
+      - NETWORKS=${SOCKET_PROXY_NETWORKS}
+      - NODES=${SOCKET_PROXY_NODES}
+      - PLUGINS=${SOCKET_PROXY_PLUGINS}
+      - SERVICES=${SOCKET_PROXY_SERVICES}
+      - SESSION=${SOCKET_PROXY_SESSION}
+      - SWARM=${SOCKET_PROXY_SWARM}
+      - SYSTEM=${SOCKET_PROXY_SYSTEM}
+      - TASKS=${SOCKET_PROXY_TASKS}
+      - VOLUMES=${SOCKET_PROXY_VOLUMES}
+      - DISABLE_IPV6=${SOCKET_PROXY_DISABLE_IPV6}
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true

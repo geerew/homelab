@@ -1,0 +1,46 @@
+# Managed by Ansible — edit ansible/files/homepage/bookmarks.yaml
+# Deploy: ansible-playbook playbooks/deploy-homepage.yml
+---
+- Developer:
+    - Github:
+        - icon: sh-github-light
+          href: https://github.com/geerew
+
+- Torrents:
+    - TorrentLeech:
+        - icon: https://www.torrentleech.org/favicon.ico
+          href: https://www.torrentleech.org/
+    - YTS:
+        - icon: https://yts.bz/assets/images/website/favicon-16x16.png
+          href: https://yts.gg/home
+    - EXT:
+        - icon: https://ext.to/static/img/favicon.png
+          href: https://ext.to/
+    - AudioBook Bay:
+        - icon: https://audiobookbay.lu/favicon-32x32.png
+          href: https://audiobookbay.lu/
+    - The Pirate Bay:
+        - icon: https://thepiratebay10.xyz/favicon.ico
+          href: https://thepiratebay10.xyz
+
+- Courses:
+  - Course Hunter:
+      - icon: https://coursehunter.net/favicon.svg
+        href: https://coursehunter.net/
+
+- Documents:
+  - Bills:
+      - icon: mdi-chart-bar-#ffffff
+        href: https://docs.google.com/spreadsheets/d/1roINiH_ZOfDHRqrJNcwrzi4Thz24-ZotDYakC0HwcZI/edit?gid=1274382432#gid=1274382432
+  - AudioBooks:
+      - icon: mdi-bookshelf-#ffffff
+        href: https://docs.google.com/spreadsheets/d/1jA1-Aq62jl--2JI0ckwLM9USntT5-p5_YgJ4uzubFXc/edit?gid=0#gid=0
+  - Pressups:
+      - icon: mdi-weight-lifter-#ffffff
+        href: https://docs.google.com/spreadsheets/d/1KQpqdum9Ip-EB33WpMW7QyK9IKdtBsqtAyE7vDW0rOc/edit?gid=0#gid=0
+  - Pullups:
+      - icon: mdi-minus-#ffffff
+        href: https://docs.google.com/spreadsheets/d/1I1iPnq3T3FI9O4pzoGCz_8wrrpU_qDUUVErBB1orjCA/edit?gid=0#gid=0
+  - Pike Pushups:
+      - icon: mdi-minus-#ffffff
+        href: https://docs.google.com/spreadsheets/d/15xl7flBGeBrEqlxEFu5spoYiAypgsliky5gHz3HVKkE/edit?gid=0#gid=0

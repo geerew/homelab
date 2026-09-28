@@ -1,0 +1,64 @@
+---
+- name: Deploy Socket Proxy
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    socket_proxy_env_keys:
+      - SOCKET_PROXY_LOG_LEVEL
+      - SOCKET_PROXY_ALLOW_START
+      - SOCKET_PROXY_ALLOW_STOP
+      - SOCKET_PROXY_ALLOW_RESTARTS
+      - SOCKET_PROXY_EVENTS
+      - SOCKET_PROXY_PING
+      - SOCKET_PROXY_VERSION
+      - SOCKET_PROXY_AUTH
+      - SOCKET_PROXY_SECRETS
+      - SOCKET_PROXY_POST
+      - SOCKET_PROXY_BUILD
+      - SOCKET_PROXY_COMMIT
+      - SOCKET_PROXY_CONFIGS
+      - SOCKET_PROXY_CONTAINERS
+      - SOCKET_PROXY_DISTRIBUTION
+      - SOCKET_PROXY_EXEC
+      - SOCKET_PROXY_IMAGES
+      - SOCKET_PROXY_INFO
+      - SOCKET_PROXY_NETWORKS
+      - SOCKET_PROXY_NODES
+      - SOCKET_PROXY_PLUGINS
+      - SOCKET_PROXY_SERVICES
+      - SOCKET_PROXY_SESSION
+      - SOCKET_PROXY_SWARM
+      - SOCKET_PROXY_SYSTEM
+      - SOCKET_PROXY_TASKS
+      - SOCKET_PROXY_VOLUMES
+      - SOCKET_PROXY_DISABLE_IPV6
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Socket Proxy settings in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env[item] is defined
+          - homelab_env[item] | string | length > 0
+        fail_msg: Set {{ item }} in {{ env_file }} (see .env.example).
+      loop: "{{ socket_proxy_env_keys }}"
+      when: not ansible_check_mode
+
+    - name: Apply Socket Proxy container configuration
+      ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: socket-proxy
+
+    - name: Report Socket Proxy deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to apply Socket Proxy settings from {{ env_file }}.
+          {% else %}
+          Socket Proxy running (log level {{ homelab_env.SOCKET_PROXY_LOG_LEVEL }}).
+          Traefik, Homepage, Dozzle, and Autokuma connect via tcp://socket-proxy:2375.
+          {% endif %}

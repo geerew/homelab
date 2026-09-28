@@ -1,0 +1,37 @@
+---
+- name: Deploy Watchtower
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Watchtower settings in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.WATCHTOWER_CLEANUP is defined
+          - homelab_env.WATCHTOWER_CLEANUP | string | length > 0
+          - homelab_env.WATCHTOWER_POLL_INTERVAL is defined
+          - homelab_env.WATCHTOWER_POLL_INTERVAL | string | length > 0
+          - homelab_env.WATCHTOWER_LABEL_ENABLE is defined
+          - homelab_env.WATCHTOWER_LABEL_ENABLE | string | length > 0
+        fail_msg: Set WATCHTOWER_* variables in {{ env_file }} (see .env.example).
+      when: not ansible_check_mode
+
+    - name: Apply Watchtower container configuration
+      ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: watchtower
+
+    - name: Report Watchtower deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to apply Watchtower settings from {{ env_file }}.
+          {% else %}
+          Watchtower running (poll every {{ homelab_env.WATCHTOWER_POLL_INTERVAL }}s,
+          label enable={{ homelab_env.WATCHTOWER_LABEL_ENABLE }},
+          cleanup={{ homelab_env.WATCHTOWER_CLEANUP }}).
+          {% endif %}

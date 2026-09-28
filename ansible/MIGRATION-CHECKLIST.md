@@ -31,14 +31,16 @@ ansible-playbook playbooks/deploy-services.yml   # 2. all app config in dependen
 Or step through individually (same order as `deploy-services.yml`):
 
 ```bash
-ansible-playbook playbooks/deploy-traefik.yml          # edge config; before Authelia middleware goes live
+ansible-playbook playbooks/deploy-socket-proxy.yml     # Docker API proxy; before Traefik
+ansible-playbook playbooks/deploy-watchtower.yml       # auto-updates
+ansible-playbook playbooks/deploy-traefik.yml          # edge config
 ansible-playbook playbooks/deploy-cloudflare-ddns.yml  # DNS records from .env
 ansible-playbook playbooks/deploy-authelia.yml         # auth; needs Docker networks from site.yml
-ansible-playbook playbooks/deploy-gluetun.yml      # VPN before *arr / qBittorrent
-ansible-playbook playbooks/deploy-dispatcharr.yml  # IPTV; before Jellyfin Live TV
-ansible-playbook playbooks/deploy-qbittorrent.yml  # WebUI on gluetun network
-ansible-playbook playbooks/deploy-jellyfin.yml     # M3U tuner → Dispatcharr
-ansible-playbook playbooks/deploy-homepage.yml     # widgets last
+ansible-playbook playbooks/deploy-gluetun.yml          # VPN before *arr / qBittorrent
+ansible-playbook playbooks/deploy-dispatcharr.yml      # IPTV; before Jellyfin Live TV
+ansible-playbook playbooks/deploy-qbittorrent.yml      # WebUI on gluetun network
+ansible-playbook playbooks/deploy-jellyfin.yml         # M3U tuner → Dispatcharr
+ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 ```
 
 **Why order matters**
@@ -46,7 +48,9 @@ ansible-playbook playbooks/deploy-homepage.yml     # widgets last
 | Playbook | Depends on |
 | --- | --- |
 | `site.yml` | — (run first: containers + `traefik_network` / `socket_proxy`) |
-| `deploy-traefik.yml` | `site.yml` |
+| `deploy-socket-proxy.yml` | `site.yml` — Traefik/Homepage/Dozzle/Autokuma need `tcp://socket-proxy:2375` |
+| `deploy-watchtower.yml` | `site.yml` |
+| `deploy-traefik.yml` | Socket Proxy running |
 | `deploy-cloudflare-ddns.yml` | `site.yml`, `CLOUDFLARE_API_TOKEN` |
 | `deploy-authelia.yml` | `site.yml` (subnet auto-detect) |
 | `deploy-gluetun.yml` | `site.yml` |
@@ -61,6 +65,8 @@ ansible-playbook playbooks/deploy-homepage.yml     # widgets last
 
 | Service | Playbook | Fully configured? |
 | --- | --- | --- |
+| **Socket Proxy** | `deploy-socket-proxy.yml` | **Yes** — API filter flags in `.env`; no on-disk config |
+| **Watchtower** | `deploy-watchtower.yml` | **Yes** — poll/cleanup settings in `.env`; no on-disk config |
 | **Traefik** | `deploy-traefik.yml` | **Yes** — static config + Authelia forward-auth middleware; `acme.json` is runtime |
 | **Cloudflare DDNS** | `deploy-cloudflare-ddns.yml` | **Yes** — settings in `.env`; no on-disk config |
 | **Authelia** | `deploy-authelia.yml` | **Yes** — `users.yml` + `configuration.yml` templated; SQLite DB + notification log are auto-created at runtime (not Ansible todos) |
@@ -68,7 +74,7 @@ ansible-playbook playbooks/deploy-homepage.yml     # widgets last
 | **Gluetun** | `deploy-gluetun.yml` | **Yes** — VPN settings in `.env`, HTTP control-server auth in `config.toml`; ports/Traefik labels stay in Compose |
 | **Jellyfin** | `deploy-jellyfin.yml` | **No** — Live TV + branding/CSS only; libraries, users, OIDC, transcoding, plugins still manual |
 | **qBittorrent** | `deploy-qbittorrent.yml` | **Mostly for WebUI** — port + LAN auth bypass; BitTorrent session prefs intentionally left to UI on existing installs |
-| **Homepage** | `deploy-homepage.yml` | **Mostly** — service list + widgets; `bookmarks.yaml` referenced but missing from `files/homepage/` |
+| **Homepage** | `deploy-homepage.yml` | **Yes** — service list + widgets from `.env`; static YAML including `bookmarks.yaml` |
 
 ---
 
@@ -87,12 +93,40 @@ ansible-playbook playbooks/deploy-homepage.yml     # widgets last
 
 ## Services with deploy playbooks
 
+### Socket Proxy — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-socket-proxy.yml` |
+| **In `deploy-services.yml`** | Yes (first) |
+| **Ansible sources** | None — configuration is entirely from `.env` via Compose |
+| **`.env` keys** | `SOCKET_PROXY_*` (Docker API permission flags + `SOCKET_PROXY_LOG_LEVEL`) |
+| **Configured by Ansible** | Validates `.env` and applies `docker compose up -d socket-proxy` |
+| **Still in Compose only** | Kuma docker-host labels, image version |
+| **Fresh stand-up** | Set Socket Proxy vars in `.env`, run before Traefik |
+
+---
+
+### Watchtower — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-watchtower.yml` |
+| **In `deploy-services.yml`** | Yes (second) |
+| **Ansible sources** | None — configuration is entirely from `.env` via Compose |
+| **`.env` keys** | `WATCHTOWER_CLEANUP`, `WATCHTOWER_POLL_INTERVAL`, `WATCHTOWER_LABEL_ENABLE` |
+| **Configured by Ansible** | Validates `.env` and applies `docker compose up -d watchtower` |
+| **Still in Compose only** | Kuma labels, host `/var/run/docker.sock` mount |
+| **Fresh stand-up** | Set Watchtower vars in `.env`, run `deploy-watchtower.yml` |
+
+---
+
 ### Traefik — ✅
 
 | | |
 | --- | --- |
 | **Playbook** | `playbooks/deploy-traefik.yml` |
-| **In `deploy-services.yml`** | Yes (first) |
+| **In `deploy-services.yml`** | Yes (after Socket Proxy + Watchtower) |
 | **Ansible sources** | `templates/traefik/traefik.yml.j2`, `templates/traefik/dynamic/authelia.yml.j2` |
 | **`.env` keys** | `DOMAIN`, `ACME_EMAIL`, `CLOUDFLARE_API_TOKEN` |
 | **Configured by Ansible** | Entrypoints, HTTP→HTTPS redirect, Docker + file providers, Cloudflare ACME resolver, Authelia `forwardAuth` middleware, dashboard route |
@@ -188,17 +222,17 @@ ansible-playbook playbooks/deploy-homepage.yml     # widgets last
 
 ---
 
-### Homepage — 🟡
+### Homepage — ✅
 
 | | |
 | --- | --- |
 | **Playbook** | `playbooks/deploy-homepage.yml` |
-| **In `deploy-services.yml`** | Yes |
-| **Ansible sources** | `templates/homepage/services.yaml.j2`, `files/homepage/{settings,widgets,docker,proxmox,kubernetes}.yaml` |
+| **In `deploy-services.yml`** | Yes (last) |
+| **Ansible sources** | `templates/homepage/services.yaml.j2`, `files/homepage/{bookmarks,settings,widgets,docker,proxmox,kubernetes}.yaml` |
 | **`.env` keys** | `DOMAIN`, `DISPATCHARR_ADMIN_*`, `GLUETUN_API_KEY`, all `HOMEPAGE_*_API_KEY`, `HOMEPAGE_TRAEFIK_*` |
-| **Configured by Ansible** | Service list with widget URLs/keys, static YAML configs |
-| **Still outside Ansible** | **`bookmarks.yaml` missing** from `files/homepage/` (playbook references it — add file or remove from loop); `HOMEPAGE_ALLOWED_HOSTS` still hardcoded in Compose |
-| **Next steps** | Add `files/homepage/bookmarks.yaml`; move allowed hosts to `.env`; template any per-service widget creds still hardcoded |
+| **Configured by Ansible** | Service list with widget URLs/keys (from `.env`), bookmarks, settings, widgets, docker/proxmox/kubernetes stubs |
+| **Still in Compose only** | `HOMEPAGE_ALLOWED_HOSTS`, Kuma labels, image version |
+| **Fresh stand-up** | Create per-app API keys in each service UI, set `HOMEPAGE_*` in `.env`, run `deploy-homepage.yml` |
 
 ---
 
@@ -213,8 +247,8 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | **Traefik** | ✅ | `services/traefik/traefik.yml`, `dynamic/authelia.yml`, `acme/acme.json` | `deploy-traefik.yml` — static + Authelia middleware; per-service routes stay on Compose labels |
 | **Authelia** | ✅ | `services/authelia/config/configuration.yml`, `users.yml` | `deploy-authelia.yml` — config done; `db.sqlite3` / `notification.txt` auto-created at runtime |
 | **Cloudflare DDNS** | ✅ | `.env` only | `deploy-cloudflare-ddns.yml` — DNS record settings in `.env` |
-| **Socket proxy** | ⬜ | Compose only | Skip — no app config |
-| **Watchtower** | ⬜ | Compose only | Skip — no app config |
+| **Socket proxy** | ✅ | `.env` only | `deploy-socket-proxy.yml` — Docker API filter flags |
+| **Watchtower** | ✅ | `.env` only | `deploy-watchtower.yml` — poll interval, cleanup, label enable |
 
 ### Monitoring / ops
 
@@ -259,7 +293,7 @@ Work top-to-bottom; each step should leave the stack usable.
 
 1. **Authelia** — everything depends on SSO
 2. ~~**Traefik**~~ — done (static + Authelia middleware in Ansible; service routes stay on Compose labels)
-3. **Homepage** — fix missing `bookmarks.yaml`; quick win
+3. ~~**Homepage**~~ — done (services template + static YAML + widget keys in `.env`)
 4. ~~**Gluetun**~~ — done (VPN in `.env`, auth roles in Ansible)
 5. **Sonarr → Radarr → Prowlarr → Bazarr** — *arr chain; share patterns (API + `config.xml` snippets)
 6. **Seerr** — depends on Jellyfin + *arr

@@ -26,6 +26,8 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | --- | --- |
 | `playbooks/site.yml` | Ensure `services/` dirs + deploy the full Docker Compose stack |
 | `playbooks/ensure-service-dirs.yml` | Create `services/` directory tree only (no Compose) |
+| `playbooks/deploy-socket-proxy.yml` | Validate Socket Proxy `.env` settings and apply container config |
+| `playbooks/deploy-watchtower.yml` | Validate Watchtower `.env` settings and apply container config |
 | `playbooks/deploy-traefik.yml` | Render Traefik static config + Authelia forward-auth middleware |
 | `playbooks/deploy-cloudflare-ddns.yml` | Validate Cloudflare DDNS `.env` settings and apply container config |
 | `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from templates, `.env`, and vars |
@@ -34,7 +36,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
 | `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
-| `playbooks/deploy-services.yml` | All app deploy playbooks in dependency order (Traefik first — see below) |
+| `playbooks/deploy-services.yml` | All deploy playbooks in dependency order (see below) |
 
 ## Usage
 
@@ -43,6 +45,10 @@ From the `ansible/` directory:
 ```bash
 # Deploy everything
 ansible-playbook playbooks/site.yml
+
+# Deploy infrastructure services from .env
+ansible-playbook playbooks/deploy-socket-proxy.yml
+ansible-playbook playbooks/deploy-watchtower.yml
 
 # Deploy Traefik static config + Authelia middleware
 ansible-playbook playbooks/deploy-traefik.yml
@@ -68,27 +74,43 @@ ansible-playbook playbooks/deploy-homepage.yml
 # Deploy Jellyfin config (custom CSS, M3U tuner, Live TV list layout)
 ansible-playbook playbooks/deploy-jellyfin.yml
 
-# Deploy all app config (ordered: Traefik → Authelia → Gluetun → … → Homepage)
+# Deploy everything in dependency order
 ansible-playbook playbooks/deploy-services.yml
 ```
 
-Run `site.yml` before any deploy playbook — Traefik/Authelia need Docker networks, Jellyfin needs Dispatcharr running, qBittorrent needs Gluetun.
+Run `site.yml` before any deploy playbook — Socket Proxy must be up before Traefik; Jellyfin needs Dispatcharr; qBittorrent needs Gluetun.
 
 ### Deploy order
 
 | Step | Playbook | Waits on |
 | --- | --- | --- |
 | 0 | `site.yml` | — |
-| 1 | `deploy-traefik.yml` | Compose stack up |
-| 2 | `deploy-cloudflare-ddns.yml` | `CLOUDFLARE_API_TOKEN`, DDNS vars in `.env` |
-| 3 | `deploy-authelia.yml` | `traefik_network`, `socket_proxy` from Compose |
-| 4 | `deploy-gluetun.yml` | Compose stack up |
-| 5 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
-| 6 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
-| 7 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
-| 8 | `deploy-homepage.yml` | — (last) |
+| 1 | `deploy-socket-proxy.yml` | Compose stack up |
+| 2 | `deploy-watchtower.yml` | Compose stack up |
+| 3 | `deploy-traefik.yml` | Socket Proxy on `:2375` |
+| 4 | `deploy-cloudflare-ddns.yml` | `CLOUDFLARE_API_TOKEN`, DDNS vars in `.env` |
+| 5 | `deploy-authelia.yml` | `traefik_network`, `socket_proxy` from Compose |
+| 6 | `deploy-gluetun.yml` | Compose stack up |
+| 7 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
+| 8 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
+| 9 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
+| 10 | `deploy-homepage.yml` | — (last) |
 
-Use `deploy-services.yml` to run steps 1–8 in this order automatically.
+Use `deploy-services.yml` to run steps 1–10 in this order automatically.
+
+### Socket Proxy
+
+Filtered Docker socket proxy for services that need container discovery without full socket access. Settings are `SOCKET_PROXY_*` flags in `.env` (see `.env.example`). `deploy-socket-proxy.yml` validates and runs `docker compose up -d socket-proxy`.
+
+### Watchtower
+
+Auto-updates containers labelled `com.centurylinklabs.watchtower.enable=true`. Settings in `.env`:
+
+| Variable | Purpose |
+| --- | --- |
+| `WATCHTOWER_CLEANUP` | Remove old images after update |
+| `WATCHTOWER_POLL_INTERVAL` | Check interval in seconds |
+| `WATCHTOWER_LABEL_ENABLE` | Only update labelled containers |
 
 ### Traefik configuration
 

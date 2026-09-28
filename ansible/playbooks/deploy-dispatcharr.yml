@@ -439,12 +439,10 @@
           "from apps.m3u.tasks import sync_auto_channels;
           from apps.m3u.models import M3UAccount;
           from apps.channels.models import Channel;
-          from django.utils import timezone;
           from datetime import timedelta;
           account=M3UAccount.objects.get(name='{{ homelab_env.DISPATCHARR_M3U_NAME }}');
-          result=sync_auto_channels(
-          account.id,
-          scan_start_time=str(timezone.now()-timedelta(hours=24)));
+          scan_start=account.updated_at - timedelta(minutes=5);
+          result=sync_auto_channels(account.id, scan_start_time=str(scan_start));
           print({'channels': Channel.objects.count(), 'sync': result})"
       register: dispatcharr_channel_sync
       changed_when: false
@@ -485,7 +483,7 @@
         msg: >-
           {% if ansible_check_mode %}
           Check mode: run without --check to bootstrap admin, configure M3U account
-          '{{ homelab_env.DISPATCHARR_M3U_NAME }}', and sync {{ dispatcharr_epl_channel_groups | length }} EPL/sports channel groups.
+          '{{ homelab_env.DISPATCHARR_M3U_NAME }}', and sync up to {{ dispatcharr_provider_group_rules | length }} EPL/sports provider group rules.
           {% else %}
           Dispatcharr ready for '{{ homelab_env.DISPATCHARR_M3U_NAME }}'.
           Admin: {{ 'already existed' if dispatcharr_user_exists else 'created' }} ('{{ homelab_env.DISPATCHARR_ADMIN_USERNAME }}').

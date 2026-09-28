@@ -53,7 +53,6 @@
         fail_msg: >-
           Set DOMAIN, DISPATCHARR_ADMIN_*, GLUETUN_API_KEY, and all HOMEPAGE_* widget
           secrets in {{ env_file }} (see .env.example).
-      when: not ansible_check_mode
 
     - name: Ensure Homepage config directory exists
       ansible.builtin.file:

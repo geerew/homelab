@@ -1,0 +1,10 @@
+---
+- name: "Apply {{ compose_service }} container configuration"
+  community.docker.docker_compose_v2:
+    project_src: "{{ homelab_dir }}"
+    env_files:
+      - "{{ env_file }}"
+    services:
+      - "{{ compose_service }}"
+    state: present
+  when: not ansible_check_mode

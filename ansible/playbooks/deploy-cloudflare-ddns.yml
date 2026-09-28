@@ -27,15 +27,9 @@
       when: not ansible_check_mode
 
     - name: Apply Cloudflare DDNS container configuration
-      community.docker.docker_compose_v2:
-        project_src: "{{ homelab_dir }}"
-        env_files:
-          - "{{ env_file }}"
-        services:
-          - cloudflare-ddns
-        state: present
-      when: not ansible_check_mode
-      register: cloudflare_ddns_compose
+      ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: cloudflare-ddns
 
     - name: Report Cloudflare DDNS deploy status
       ansible.builtin.debug:
