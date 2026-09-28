@@ -246,7 +246,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Playbook** | `playbooks/deploy-homepage.yml` |
 | **In `deploy-services.yml`** | Yes (last) |
 | **Ansible sources** | `templates/homepage/services.yaml.j2`, `files/homepage/{bookmarks,settings,widgets,docker,proxmox,kubernetes}.yaml` |
-| **`.env` keys** | `DOMAIN`, `DISPATCHARR_ADMIN_*`, `GLUETUN_API_KEY`, all `HOMEPAGE_*_API_KEY`, `HOMEPAGE_TRAEFIK_*` |
+| **`.env` keys** | `DOMAIN`, `DISPATCHARR_ADMIN_*`, `GLUETUN_API_KEY`, all `HOMEPAGE_*_API_KEY` |
 | **Configured by Ansible** | Service list with widget URLs/keys (from `.env`), bookmarks, settings, widgets, docker/proxmox/kubernetes stubs |
 | **Still in Compose only** | `HOMEPAGE_ALLOWED_HOSTS`, Kuma labels, image version |
 | **Fresh stand-up** | Create per-app API keys in each service UI, set `HOMEPAGE_*` in `.env`, run `deploy-homepage.yml` |

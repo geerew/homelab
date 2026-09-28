@@ -46,10 +46,6 @@
           - homelab_env.HOMEPAGE_SEERR_API_KEY | length > 0
           - homelab_env.HOMEPAGE_BAZARR_API_KEY is defined
           - homelab_env.HOMEPAGE_BAZARR_API_KEY | length > 0
-          - homelab_env.HOMEPAGE_TRAEFIK_USERNAME is defined
-          - homelab_env.HOMEPAGE_TRAEFIK_USERNAME | length > 0
-          - homelab_env.HOMEPAGE_TRAEFIK_PASSWORD is defined
-          - homelab_env.HOMEPAGE_TRAEFIK_PASSWORD | length > 0
         fail_msg: >-
           Set DOMAIN, DISPATCHARR_ADMIN_*, GLUETUN_API_KEY, and all HOMEPAGE_* widget
           secrets in {{ env_file }} (see .env.example).

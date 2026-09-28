@@ -153,8 +153,6 @@
         widget:
           type: traefik
           url: http://traefik:8080
-          username: {{ homelab_env.HOMEPAGE_TRAEFIK_USERNAME }}
-          password: "{{ homelab_env.HOMEPAGE_TRAEFIK_PASSWORD }}"
           fields: ["routers", "services", "middleware"]
 
     - Gluetun:

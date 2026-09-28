@@ -177,7 +177,7 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Wallos | `HOMEPAGE_WALLOS_API_KEY` |
 | Sonarr, Radarr, Prowlarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
-| Traefik dashboard | `HOMEPAGE_TRAEFIK_USERNAME`, `HOMEPAGE_TRAEFIK_PASSWORD` |
+| Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
 | Dispatcharr | `DISPATCHARR_ADMIN_*` |
 | Gluetun | `GLUETUN_API_KEY`, `VPN_SERVICE_PROVIDER`, `VPN_TYPE`, `WIREGUARD_*`, `SERVER_CITIES`, `GLUETUN_DNS_ADDRESS`, `FIREWALL_OUTBOUND_SUBNETS` |
 
