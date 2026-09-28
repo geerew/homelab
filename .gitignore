@@ -5,6 +5,7 @@
 
 # Authelia users (plain passwords) — generated users.yml lives under services/
 authelia-users.yml
+authelia-jwks.pem
 
 # Old compose files (moved here; contain secrets)
 archive/

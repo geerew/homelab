@@ -40,7 +40,7 @@ ansible-playbook playbooks/deploy-services.yml
 
 | Service | Playbook | Fully configured? |
 | --- | --- | --- |
-| **Authelia** | `deploy-authelia.yml` | **Partial** — `users.yml` from `authelia-users.yml`; `configuration.yml` still manual |
+| **Authelia** | `deploy-authelia.yml` | **Yes** — `users.yml` + `configuration.yml` templated; SQLite DB + notification log are auto-created at runtime (not Ansible todos) |
 | **Dispatcharr** | `deploy-dispatcharr.yml` | **Yes** — admin, M3U/XC provider, XC password, EPL/sports channel groups, auto channel sync |
 | **Gluetun** | `deploy-gluetun.yml` | **Mostly** — HTTP control-server auth is templated; VPN/Mullvad settings still live in `compose.yaml` env |
 | **Jellyfin** | `deploy-jellyfin.yml` | **No** — Live TV + branding/CSS only; libraries, users, OIDC, transcoding, plugins still manual |
@@ -64,16 +64,18 @@ ansible-playbook playbooks/deploy-services.yml
 
 ## Services with deploy playbooks
 
-### Authelia — 🟡
+### Authelia — ✅
 
 | | |
 | --- | --- |
 | **Playbook** | `playbooks/deploy-authelia.yml` |
 | **In `deploy-services.yml`** | Yes |
-| **Ansible sources** | `authelia-users.yml` (repo root, gitignored), `templates/authelia/users.yml.j2` |
-| **Configured by Ansible** | `users.yml` — display name, email, argon2 password hash, groups |
-| **Still outside Ansible** | `configuration.yml` (OIDC, access rules, 2FA), `db.sqlite3` |
-| **Fresh stand-up** | Copy `authelia-users.example.yml` → `authelia-users.yml`, set passwords, run `deploy-authelia.yml` |
+| **Ansible sources** | `authelia-users.yml`, `authelia-jwks.pem` (repo root, gitignored), `templates/authelia/*.j2`, `vars/authelia_oidc_clients.yml`, `tasks/resolve-docker-network-subnets.yml`, `tasks/authelia-resolve-oidc-client-secret.yml` |
+| **`.env` keys** | `DOMAIN`, `AUTHELIA_SESSION_SECRET`, `AUTHELIA_JWT_SECRET`, `AUTHELIA_STORAGE_ENCRYPTION_KEY`, `AUTHELIA_OIDC_HMAC_SECRET`, `OIDC_CLIENT_SECRET` |
+| **Configured by Ansible** | `users.yml` (argon2 hashes), `configuration.yml` (session/storage/OIDC secrets, JWKS, 6 OIDC clients, CORS, vpn-status bypass subnets, access rules) |
+| **Auto-managed at runtime (not Ansible)** | `db.sqlite3` — created on first start; stores OIDC consents, 2FA enrollments, session persistence (encrypted with `AUTHELIA_STORAGE_ENCRYPTION_KEY`). `notification.txt` — append-only log for the filesystem notifier (password-reset emails); empty until something triggers a notification. Neither needs templating or migration work. |
+| **Fresh stand-up** | Copy `authelia-users.example.yml` → `authelia-users.yml`, set secrets in `.env`, extract JWKS PEM → `authelia-jwks.pem`, run `deploy-authelia.yml`. Authelia creates an empty DB on first start — no manual setup. |
+| **Existing install** | Keep `db.sqlite3` when migrating (preserves 2FA devices and OIDC consents). Back up before wiping `services/authelia/config/`. |
 
 ---
 
@@ -156,7 +158,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | Service | Compose only today | Config location | Suggested `deploy-*` scope |
 | --- | --- | --- | --- |
 | **Traefik** | ⬜ | `services/traefik/acme/acme.json`, labels in Compose | `deploy-traefik.yml` — dynamic middlewares, optional file provider configs; ACME stays runtime |
-| **Authelia** | 🟡 | `services/authelia/config/configuration.yml`, `users.yml` | `deploy-authelia.yml` — **users done** via `authelia-users.yml`; still todo: `configuration.yml`, OIDC clients, access rules |
+| **Authelia** | ✅ | `services/authelia/config/configuration.yml`, `users.yml` | `deploy-authelia.yml` — config done; `db.sqlite3` / `notification.txt` auto-created at runtime |
 | **Cloudflare DDNS** | ⬜ | Compose env | `deploy-cloudflare-ddns.yml` — likely env-only, low priority |
 | **Socket proxy** | ⬜ | Compose only | Skip — no app config |
 | **Watchtower** | ⬜ | Compose only | Skip — no app config |

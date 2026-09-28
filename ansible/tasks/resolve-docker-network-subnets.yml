@@ -1,0 +1,60 @@
+---
+- name: Inspect traefik_network subnet
+  check_mode: false
+  ansible.builtin.command:
+    cmd: docker network inspect traefik_network --format '{{ "{{" }} (index .IPAM.Config 0).Subnet {{ "}}" }}'
+  register: docker_network_traefik_inspect
+  changed_when: false
+  failed_when: false
+
+- name: Inspect socket_proxy subnet
+  check_mode: false
+  ansible.builtin.command:
+    cmd: docker network inspect socket_proxy --format '{{ "{{" }} (index .IPAM.Config 0).Subnet {{ "}}" }}'
+  register: docker_network_socket_proxy_inspect
+  changed_when: false
+  failed_when: false
+
+- name: Read Docker network subnets from compose.yaml when networks are missing
+  check_mode: false
+  ansible.builtin.shell: |
+    python3 <<'PY'
+    import json
+    import pathlib
+    import re
+
+    compose = pathlib.Path("{{ homelab_dir }}/compose.yaml").read_text()
+
+    def extract(network_name: str) -> str:
+        match = re.search(
+            rf"{network_name}:.*?subnet:\s*([0-9./]+)",
+            compose,
+            re.DOTALL,
+        )
+        return match.group(1) if match else ""
+
+    print(json.dumps({
+        "traefik": extract("traefik_network"),
+        "socket_proxy": extract("socket_proxy"),
+    }))
+    PY
+  register: docker_network_compose_subnets
+  changed_when: false
+  when: >-
+    (docker_network_traefik_inspect.rc != 0 or (docker_network_traefik_inspect.stdout | trim) == "")
+    or (docker_network_socket_proxy_inspect.rc != 0 or (docker_network_socket_proxy_inspect.stdout | trim) == "")
+
+- name: Set Docker network subnet facts
+  ansible.builtin.set_fact:
+    docker_network_traefik_subnet: >-
+      {{
+        docker_network_traefik_inspect.stdout | default('') | trim
+        if (docker_network_traefik_inspect.stdout | default('') | trim) | length > 0
+        else (docker_network_compose_subnets.stdout | default('{}') | from_json).traefik | default('')
+      }}
+    docker_network_socket_proxy_subnet: >-
+      {{
+        docker_network_socket_proxy_inspect.stdout | default('') | trim
+        if (docker_network_socket_proxy_inspect.stdout | default('') | trim) | length > 0
+        else (docker_network_compose_subnets.stdout | default('{}') | from_json).socket_proxy | default('')
+      }}

@@ -32,12 +32,17 @@ Service data (configs, databases, cache) lives under `services/` (gitignored). A
 
 ## Changing the shared OIDC secret
 
-All Authelia OIDC clients (Audiobookshelf, Jellyfin, Mealie, Wallos, Trilium) use the same client secret. To rotate it:
+All Authelia OIDC clients (Audiobookshelf, Jellyfin, Mealie, Memos, Sparky Fitness, Wallos) use the same client secret. To rotate it:
 
-1. Generate a new hash, e.g. `docker run --rm authelia/authelia authelia crypto hash generate pbkdf2 --password 'YourNewSecret'`.
-2. Update `authelia/config/configuration.yml`: set `client_secret` to the new hash for every client.
-3. Update `OIDC_CLIENT_SECRET` in `.env` and restart Mealie and Trilium (`docker compose up -d mealie trilium`).
-4. Update Jellyfin, Audiobookshelf, and Wallos in their own config/UIs to use the same new secret.
+1. Set the new plain secret in `.env` as `OIDC_CLIENT_SECRET`.
+2. Re-deploy Authelia (hashes the secret into `configuration.yml` for all clients):
+
+   ```bash
+   cd ansible && ansible-playbook playbooks/deploy-authelia.yml
+   ```
+
+3. Restart apps that read `OIDC_CLIENT_SECRET` from Compose env: `docker compose up -d mealie sparkyfitness memos`.
+4. Update Jellyfin, Audiobookshelf, and Wallos in their own config/UIs to use the same new plain secret.
 
 ## Optional: Kuma health checks for *arr apps
 

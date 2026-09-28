@@ -26,7 +26,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | --- | --- |
 | `playbooks/site.yml` | Ensure `services/` dirs + deploy the full Docker Compose stack |
 | `playbooks/ensure-service-dirs.yml` | Create `services/` directory tree only (no Compose) |
-| `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` from `authelia-users.yml` |
+| `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from templates, `.env`, and vars |
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
@@ -42,7 +42,7 @@ From the `ansible/` directory:
 # Deploy everything
 ansible-playbook playbooks/site.yml
 
-# Deploy Authelia users (from authelia-users.yml)
+# Deploy Authelia users + configuration
 ansible-playbook playbooks/deploy-authelia.yml
 
 # Deploy Dispatcharr (admin + M3U provider + EPL/sports channels)
@@ -91,9 +91,18 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 
 Gluetun `config.toml` is generated to `services/gluetun/config.toml` (gitignored) and bind-mounted into the container at `/gluetun/auth/config.toml`.
 
-### Authelia users
+### Authelia
 
-User accounts are defined in `authelia-users.yml` at the repo root (gitignored). Copy from `authelia-users.example.yml`:
+Authelia config is split across `.env`, gitignored files, and committed Ansible sources:
+
+| Output | Source |
+| --- | --- |
+| `services/authelia/config/users.yml` | `authelia-users.yml` (repo root, gitignored) → [`templates/authelia/users.yml.j2`](templates/authelia/users.yml.j2) |
+| `services/authelia/config/configuration.yml` | [`templates/authelia/configuration.yml.j2`](templates/authelia/configuration.yml.j2) + `.env` + [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml) + `authelia-jwks.pem` |
+
+Do not edit `users.yml` or `configuration.yml` directly — changes will be overwritten on the next deploy.
+
+**Users** — copy `authelia-users.example.yml` → `authelia-users.yml`:
 
 ```yaml
 users:
@@ -105,11 +114,27 @@ users:
       - admins
 ```
 
-Use `password:` for plain text (Ansible hashes with argon2 at deploy time), or `password_hash:` to keep an existing hash until you set a new password. Deploy renders `services/authelia/config/users.yml` (gitignored). Do not edit `users.yml` directly — changes will be overwritten on the next deploy.
+Use `password:` for plain text (Ansible hashes with argon2 at deploy time), or `password_hash:` to keep an existing hash until you set a new password.
+
+**Secrets in `.env`** (migrate from your existing `configuration.yml` on first run):
+
+| Variable | Purpose |
+| --- | --- |
+| `AUTHELIA_SESSION_SECRET` | Session cookie signing |
+| `AUTHELIA_JWT_SECRET` | Password-reset token signing |
+| `AUTHELIA_STORAGE_ENCRYPTION_KEY` | Encrypts `db.sqlite3` — **never change** unless you accept data loss |
+| `AUTHELIA_OIDC_HMAC_SECRET` | OIDC HMAC |
+| `OIDC_CLIENT_SECRET` | Plain secret shared by all OIDC apps; PBKDF2-hashed into `configuration.yml` at deploy |
+
+**JWKS private key** — extract once from your existing `configuration.yml` into `authelia-jwks.pem` at the repo root (gitignored). Never regenerate unless deliberately rotating OIDC signing keys.
+
+**OIDC clients** — structure (redirect URIs, scopes, etc.) lives in [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml). Active clients: Audiobookshelf, Jellyfin, Mealie, Memos, Sparky Fitness, Wallos.
+
+**Access control** — `vpn-status.${DOMAIN}` bypass auto-detects `traefik_network` and `socket_proxy` subnets via [`tasks/resolve-docker-network-subnets.yml`](tasks/resolve-docker-network-subnets.yml).
 
 ```bash
 ansible-playbook playbooks/deploy-authelia.yml
-docker compose restart authelia   # optional if playbook did not restart
+# Restarts Authelia via docker compose when config changes
 ```
 
 ### qBittorrent WebUI
