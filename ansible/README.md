@@ -28,6 +28,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/ensure-service-dirs.yml` | Create `services/` directory tree only (no Compose) |
 | `playbooks/deploy-socket-proxy.yml` | Validate Socket Proxy `.env` settings and apply container config |
 | `playbooks/deploy-watchtower.yml` | Validate Watchtower `.env` settings and apply container config |
+| `playbooks/deploy-dozzle.yml` | Validate Dozzle `.env` settings and apply container config |
 | `playbooks/deploy-traefik.yml` | Render Traefik static config + Authelia forward-auth middleware |
 | `playbooks/deploy-cloudflare-ddns.yml` | Validate Cloudflare DDNS `.env` settings and apply container config |
 | `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from templates, `.env`, and vars |
@@ -49,6 +50,9 @@ ansible-playbook playbooks/site.yml
 # Deploy infrastructure services from .env
 ansible-playbook playbooks/deploy-socket-proxy.yml
 ansible-playbook playbooks/deploy-watchtower.yml
+
+# Deploy Dozzle log viewer settings from .env
+ansible-playbook playbooks/deploy-dozzle.yml
 
 # Deploy Traefik static config + Authelia middleware
 ansible-playbook playbooks/deploy-traefik.yml
@@ -87,16 +91,17 @@ Run `site.yml` before any deploy playbook — Socket Proxy must be up before Tra
 | 0 | `site.yml` | — |
 | 1 | `deploy-socket-proxy.yml` | Compose stack up |
 | 2 | `deploy-watchtower.yml` | Compose stack up |
-| 3 | `deploy-traefik.yml` | Socket Proxy on `:2375` |
-| 4 | `deploy-cloudflare-ddns.yml` | `CLOUDFLARE_API_TOKEN`, DDNS vars in `.env` |
-| 5 | `deploy-authelia.yml` | `traefik_network`, `socket_proxy` from Compose |
-| 6 | `deploy-gluetun.yml` | Compose stack up |
-| 7 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
-| 8 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
-| 9 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
-| 10 | `deploy-homepage.yml` | — (last) |
+| 3 | `deploy-dozzle.yml` | Socket Proxy on `:2375` |
+| 4 | `deploy-traefik.yml` | Socket Proxy on `:2375` |
+| 5 | `deploy-cloudflare-ddns.yml` | `CLOUDFLARE_API_TOKEN`, DDNS vars in `.env` |
+| 6 | `deploy-authelia.yml` | `traefik_network`, `socket_proxy` from Compose |
+| 7 | `deploy-gluetun.yml` | Compose stack up |
+| 8 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
+| 9 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
+| 10 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
+| 11 | `deploy-homepage.yml` | — (last) |
 
-Use `deploy-services.yml` to run steps 1–10 in this order automatically.
+Use `deploy-services.yml` to run steps 1–11 in this order automatically.
 
 ### Socket Proxy
 
@@ -111,6 +116,18 @@ Auto-updates containers labelled `com.centurylinklabs.watchtower.enable=true`. S
 | `WATCHTOWER_CLEANUP` | Remove old images after update |
 | `WATCHTOWER_POLL_INTERVAL` | Check interval in seconds |
 | `WATCHTOWER_LABEL_ENABLE` | Only update labelled containers |
+
+### Dozzle
+
+Web UI for container logs at `https://logs.${DOMAIN}/` (Authelia via Traefik). Reads container metadata via Socket Proxy — no direct Docker socket mount. Settings in `.env`:
+
+| Variable | Purpose |
+| --- | --- |
+| `DOZZLE_LEVEL` | Log verbosity (`info`, `debug`, etc.) |
+| `DOZZLE_FILTER` | Container filter (default `status=running`) |
+| `DOZZLE_REMOTE_HOST` | Docker API endpoint (`tcp://socket-proxy:2375`) |
+| `DOZZLE_AUTH_PROVIDER` | `forward-proxy` — trust Authelia user header from Traefik |
+| `DOZZLE_AUTH_HEADER_USER` | Header name (`Remote-User`) |
 
 ### Traefik configuration
 

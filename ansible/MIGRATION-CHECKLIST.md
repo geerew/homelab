@@ -33,6 +33,7 @@ Or step through individually (same order as `deploy-services.yml`):
 ```bash
 ansible-playbook playbooks/deploy-socket-proxy.yml     # Docker API proxy; before Traefik
 ansible-playbook playbooks/deploy-watchtower.yml       # auto-updates
+ansible-playbook playbooks/deploy-dozzle.yml          # container logs UI
 ansible-playbook playbooks/deploy-traefik.yml          # edge config
 ansible-playbook playbooks/deploy-cloudflare-ddns.yml  # DNS records from .env
 ansible-playbook playbooks/deploy-authelia.yml         # auth; needs Docker networks from site.yml
@@ -50,6 +51,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | `site.yml` | — (run first: containers + `traefik_network` / `socket_proxy`) |
 | `deploy-socket-proxy.yml` | `site.yml` — Traefik/Homepage/Dozzle/Autokuma need `tcp://socket-proxy:2375` |
 | `deploy-watchtower.yml` | `site.yml` |
+| `deploy-dozzle.yml` | Socket Proxy running |
 | `deploy-traefik.yml` | Socket Proxy running |
 | `deploy-cloudflare-ddns.yml` | `site.yml`, `CLOUDFLARE_API_TOKEN` |
 | `deploy-authelia.yml` | `site.yml` (subnet auto-detect) |
@@ -67,6 +69,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | --- | --- | --- |
 | **Socket Proxy** | `deploy-socket-proxy.yml` | **Yes** — API filter flags in `.env`; no on-disk config |
 | **Watchtower** | `deploy-watchtower.yml` | **Yes** — poll/cleanup settings in `.env`; no on-disk config |
+| **Dozzle** | `deploy-dozzle.yml` | **Yes** — log viewer settings in `.env`; no on-disk config |
 | **Traefik** | `deploy-traefik.yml` | **Yes** — static config + Authelia forward-auth middleware; `acme.json` is runtime |
 | **Cloudflare DDNS** | `deploy-cloudflare-ddns.yml` | **Yes** — settings in `.env`; no on-disk config |
 | **Authelia** | `deploy-authelia.yml` | **Yes** — `users.yml` + `configuration.yml` templated; SQLite DB + notification log are auto-created at runtime (not Ansible todos) |
@@ -118,6 +121,20 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Configured by Ansible** | Validates `.env` and applies `docker compose up -d watchtower` |
 | **Still in Compose only** | Kuma labels, host `/var/run/docker.sock` mount |
 | **Fresh stand-up** | Set Watchtower vars in `.env`, run `deploy-watchtower.yml` |
+
+---
+
+### Dozzle — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-dozzle.yml` |
+| **In `deploy-services.yml`** | Yes (third, after Socket Proxy + Watchtower) |
+| **Ansible sources** | None — configuration is entirely from `.env` via Compose |
+| **`.env` keys** | `DOZZLE_LEVEL`, `DOZZLE_FILTER`, `DOZZLE_REMOTE_HOST`, `DOZZLE_AUTH_PROVIDER`, `DOZZLE_AUTH_HEADER_USER` |
+| **Configured by Ansible** | Validates `.env` and applies `docker compose up -d dozzle` |
+| **Still in Compose only** | Traefik/Kuma labels, image version |
+| **Fresh stand-up** | Set Dozzle vars in `.env`, run after `deploy-socket-proxy.yml` |
 
 ---
 
@@ -256,7 +273,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | --- | --- | --- | --- |
 | **Uptime Kuma** | ⬜ | `services/uptime-kuma/data/` (SQLite) | `deploy-uptime-kuma.yml` — monitors from Compose `kuma.*` labels + API; backup/restore strategy |
 | **Autokuma** | ⬜ | `services/autokuma/data/` | `deploy-autokuma.yml` — pair with Kuma URL/API key from `.env` |
-| **Dozzle** | ⬜ | Compose only | Skip or env-only |
+| **Dozzle** | ✅ | `.env` only | `deploy-dozzle.yml` — log level, filter, Socket Proxy host, forward-auth header |
 
 ### Media stack (*arr + requests)
 

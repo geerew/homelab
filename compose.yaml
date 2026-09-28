@@ -207,11 +207,11 @@ services:
       - traefik_network
       - socket_proxy
     environment:
-      - DOZZLE_LEVEL=info
-      - DOZZLE_FILTER=status=running
-      - DOZZLE_REMOTE_HOST=tcp://socket-proxy:2375
-      - DOZZLE_AUTH_PROVIDER=forward-proxy
-      - DOZZLE_AUTH_HEADER_USER=Remote-User
+      - DOZZLE_LEVEL=${DOZZLE_LEVEL}
+      - DOZZLE_FILTER=${DOZZLE_FILTER}
+      - DOZZLE_REMOTE_HOST=${DOZZLE_REMOTE_HOST}
+      - DOZZLE_AUTH_PROVIDER=${DOZZLE_AUTH_PROVIDER}
+      - DOZZLE_AUTH_HEADER_USER=${DOZZLE_AUTH_HEADER_USER}
       - TZ=${TZ}
     labels:
       # Watchtower/home/mike/Documents/homelab/.env

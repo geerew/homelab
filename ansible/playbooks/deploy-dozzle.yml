@@ -1,0 +1,41 @@
+---
+- name: Deploy Dozzle
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Dozzle settings in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DOZZLE_LEVEL is defined
+          - homelab_env.DOZZLE_LEVEL | length > 0
+          - homelab_env.DOZZLE_FILTER is defined
+          - homelab_env.DOZZLE_FILTER | length > 0
+          - homelab_env.DOZZLE_REMOTE_HOST is defined
+          - homelab_env.DOZZLE_REMOTE_HOST | length > 0
+          - homelab_env.DOZZLE_AUTH_PROVIDER is defined
+          - homelab_env.DOZZLE_AUTH_PROVIDER | length > 0
+          - homelab_env.DOZZLE_AUTH_HEADER_USER is defined
+          - homelab_env.DOZZLE_AUTH_HEADER_USER | length > 0
+        fail_msg: Set DOZZLE_* variables in {{ env_file }} (see .env.example).
+      when: not ansible_check_mode
+
+    - name: Apply Dozzle container configuration
+      ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: dozzle
+
+    - name: Report Dozzle deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to apply Dozzle settings from {{ env_file }}.
+          {% else %}
+          Dozzle running at https://logs.{{ homelab_env.DOMAIN }}/
+          (remote Docker API {{ homelab_env.DOZZLE_REMOTE_HOST }},
+          auth={{ homelab_env.DOZZLE_AUTH_PROVIDER }}).
+          {% endif %}
