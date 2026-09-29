@@ -18,7 +18,8 @@
 #  11. Dispatcharr      — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
 #  12. qBittorrent      — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
 #  13. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
-#  14. Homepage         — service list + widgets reference the above (deploy last)
+#  14. Jellyscope       — admin account + Jellyfin API key from Ansible
+#  15. Homepage         — service list + widgets reference the above (deploy last)
 
 - name: Deploy Socket Proxy
   ansible.builtin.import_playbook: deploy-socket-proxy.yml
@@ -58,6 +59,9 @@
 
 - name: Deploy Jellyfin
   ansible.builtin.import_playbook: deploy-jellyfin.yml
+
+- name: Deploy Jellyscope
+  ansible.builtin.import_playbook: deploy-jellyscope.yml
 
 - name: Deploy Homepage
   ansible.builtin.import_playbook: deploy-homepage.yml

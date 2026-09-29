@@ -346,7 +346,6 @@ services:
       - PORT=8097
       - SECRET_KEY=${JELLYSCOPE_SECRET_KEY}
       - JELLYFIN_URL=http://jellyfin:8096
-      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
       - SECURE_COOKIES=1
       - FORWARDED_ALLOW_IPS=192.168.90.0/24 
       - TZ=${TZ}

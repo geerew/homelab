@@ -1,0 +1,40 @@
+---
+- name: Bootstrap Jellyscope admin and Jellyfin settings
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - -u
+      - "{{ homelab_env.PUID | default('1000') }}:{{ homelab_env.PGID | default('1000') }}"
+      - -v
+      - "{{ data_dir }}/services/jellyscope/data:/app/data"
+      - -v
+      - "{{ playbook_dir }}/../scripts/bootstrap_jellyscope.py:/bootstrap_jellyscope.py:ro"
+      - -e
+      - PYTHONPATH=/app
+      - -e
+      - SECRET_KEY={{ homelab_env.JELLYSCOPE_SECRET_KEY }}
+      - -e
+      - JELLYSCOPE_ADMIN_USERNAME={{ homelab_env.JELLYSCOPE_ADMIN_USERNAME }}
+      - -e
+      - JELLYSCOPE_ADMIN_PASSWORD={{ homelab_env.JELLYSCOPE_ADMIN_PASSWORD }}
+      - -e
+      - JELLYSCOPE_JELLYFIN_API_KEY={{ jellyfin_api_key }}
+      - -e
+      - JELLYFIN_URL=http://jellyfin:8096
+      - jellyscope:latest
+      - python
+      - /bootstrap_jellyscope.py
+  register: jellyscope_bootstrap
+  changed_when: >-
+    'created admin account' in jellyscope_bootstrap.stdout
+    or 'updated admin account' in jellyscope_bootstrap.stdout
+    or 'jellyfin connection configured' in jellyscope_bootstrap.stdout
+    or 'jellyfin connection verified' in jellyscope_bootstrap.stdout
+    or 'ui language set to' in jellyscope_bootstrap.stdout
+    or 'removed stale data/secret_key' in jellyscope_bootstrap.stdout
+  no_log: true
+  when: not ansible_check_mode

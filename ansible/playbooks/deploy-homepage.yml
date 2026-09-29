@@ -4,6 +4,7 @@
   gather_facts: false
 
   vars:
+    jellyfin_api_key_app_name: homepage
     homepage_static_configs:
       - bookmarks.yaml
       - settings.yaml
@@ -28,8 +29,6 @@
           - homelab_env.DISPATCHARR_ADMIN_PASSWORD | length > 0
           - homelab_env.GLUETUN_API_KEY is defined
           - homelab_env.GLUETUN_API_KEY | length > 0
-          - homelab_env.HOMEPAGE_JELLYFIN_API_KEY is defined
-          - homelab_env.HOMEPAGE_JELLYFIN_API_KEY | length > 0
           - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY is defined
           - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY | length > 0
           - homelab_env.HOMEPAGE_MEALIE_API_KEY is defined
@@ -45,8 +44,27 @@
           - homelab_env.HOMEPAGE_BAZARR_API_KEY is defined
           - homelab_env.HOMEPAGE_BAZARR_API_KEY | length > 0
         fail_msg: >-
-          Set DOMAIN, DISPATCHARR_ADMIN_*, GLUETUN_API_KEY, and all HOMEPAGE_* widget
-          secrets in {{ env_file }} (see .env.example).
+          Set DOMAIN, DISPATCHARR_ADMIN_*, GLUETUN_API_KEY, and HOMEPAGE_* widget
+          secrets in {{ env_file }} (see .env.example). Jellyfin is automatic.
+
+    - name: Ensure Jellyfin API key for Homepage widget
+      ansible.builtin.import_tasks: ../tasks/ensure-jellyfin-api-key.yml
+
+    - name: Verify homepage key is listed in Jellyfin
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8096/Auth/Keys
+        headers:
+          Authorization: 'MediaBrowser Token="{{ jellyfin_api_key }}"'
+        return_content: true
+        status_code: 200
+      register: jellyfin_homepage_keys
+      failed_when: >-
+        jellyfin_homepage_keys.json.Items
+        | selectattr('AppName', 'equalto', 'homepage')
+        | list
+        | length == 0
+      changed_when: false
+      when: not ansible_check_mode
 
     - name: Ensure Homepage config directory exists
       ansible.builtin.file:

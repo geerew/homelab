@@ -12,7 +12,7 @@
         widget:
           type: jellyfin
           url: https://tv.{{ homelab_env.DOMAIN }}/
-          key: {{ homelab_env.HOMEPAGE_JELLYFIN_API_KEY }}
+          key: {{ jellyfin_api_key }}
           version: 2
           enableBlocks: true
           enableNowPlaying: true
@@ -20,6 +20,13 @@
           showEpisodeNumber: true
           expandOneStreamToTwoRows: false
           fields: ["movies", "series"]
+
+    - Jellyscope:
+        icon: mdi-chart-box-outline
+        href: https://tv-stats.{{ homelab_env.DOMAIN }}/
+        description: Jellyfin Stats
+        server: local
+        container: jellyscope
 
     - Audiobookshelf:
         icon: sh-audiobookshelf

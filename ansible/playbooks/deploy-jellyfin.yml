@@ -9,7 +9,7 @@
     jellyfin_livetv_legacy_hdhr_tuner_id: cdaf3d789a214065a6f01b7f3067a340
     jellyfin_livetv_m3u_url: http://dispatcharr:9191/output/m3u/
     jellyfin_refresh_channels_task_id: 0c9ee3a88fc15547c6852205480da1fd
-    jellyfin_api_auth_header: "MediaBrowser Token=\"{{ homelab_env.JELLYFIN_API_KEY }}\""
+    jellyfin_api_key_app_name: ansible
 
   pre_tasks:
     - ansible.builtin.import_tasks: ../tasks/load-env.yml
@@ -21,10 +21,15 @@
         that:
           - homelab_env.DOMAIN is defined
           - homelab_env.DOMAIN | length > 0
-          - homelab_env.JELLYFIN_API_KEY is defined
-          - homelab_env.JELLYFIN_API_KEY | length > 0
         fail_msg: >-
-          Set DOMAIN and JELLYFIN_API_KEY in {{ env_file }} (see .env.example).
+          Set DOMAIN in {{ env_file }} (see .env.example).
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/ensure-jellyfin-api-key.yml
+
+    - name: Set Jellyfin API auth header
+      ansible.builtin.set_fact:
+        jellyfin_api_auth_header: 'MediaBrowser Token="{{ jellyfin_api_key }}"'
       when: not ansible_check_mode
 
     - name: Ensure Jellyfin config directory exists

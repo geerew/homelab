@@ -232,8 +232,8 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Playbook** | `playbooks/deploy-jellyfin.yml` |
 | **In `deploy-services.yml`** | Yes |
 | **Ansible sources** | `templates/jellyfin/branding.xml.j2`, `templates/jellyfin/livetv.xml.j2`, `files/jellyfin/custom.css`, `files/jellyfin/livetv-channels-list.css` |
-| **`.env` keys** | `DOMAIN`, `JELLYFIN_API_KEY` |
-| **Configured by Ansible** | Custom CSS (Intro Skipper styling, Authelia SSO button), Live TV M3U tuner → Dispatcharr, remove legacy HDHomeRun tuner, channel re-import on livetv.xml change |
+| **`.env` keys** | `DOMAIN` |
+| **Configured by Ansible** | Custom CSS (Intro Skipper styling, Authelia SSO button), Live TV M3U tuner → Dispatcharr, remove legacy HDHomeRun tuner, channel re-import on livetv.xml change; API key named `ansible` read from `jellyfin.db` or created automatically |
 | **Still outside Ansible** | Media libraries + folder paths, users, OIDC (`OIDC_CLIENT_SECRET`), transcoding/HW accel, plugins, server name, remote access, collections, most `system.xml` / `encoding.xml` |
 | **Next steps** | Template `system.xml` / network settings; API or templated library paths from `MEDIA1_DIR` / `MEDIA2_DIR`; OIDC provider block; Intro Skipper plugin config if file-based |
 
@@ -246,10 +246,10 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Playbook** | `playbooks/deploy-homepage.yml` |
 | **In `deploy-services.yml`** | Yes (last) |
 | **Ansible sources** | `templates/homepage/services.yaml.j2`, `files/homepage/{bookmarks,settings,widgets,docker,proxmox,kubernetes}.yaml` |
-| **`.env` keys** | `DOMAIN`, `DISPATCHARR_ADMIN_*`, `GLUETUN_API_KEY`, all `HOMEPAGE_*_API_KEY` |
-| **Configured by Ansible** | Service list with widget URLs/keys (from `.env`), bookmarks, settings, widgets, docker/proxmox/kubernetes stubs |
+| **`.env` keys** | `DOMAIN`, `DISPATCHARR_ADMIN_*`, `GLUETUN_API_KEY`, `HOMEPAGE_*_API_KEY` (except Jellyfin — auto from `jellyfin.db`) |
+| **Configured by Ansible** | Service list with widget URLs/keys; Jellyfin widget key named `homepage` read/created in `jellyfin.db`; bookmarks, settings, widgets, docker/proxmox/kubernetes stubs |
 | **Still in Compose only** | `HOMEPAGE_ALLOWED_HOSTS`, Kuma labels, image version |
-| **Fresh stand-up** | Create per-app API keys in each service UI, set `HOMEPAGE_*` in `.env`, run `deploy-homepage.yml` |
+| **Fresh stand-up** | Create per-app API keys in each service UI (except Jellyfin), set remaining `HOMEPAGE_*` in `.env`, run `deploy-homepage.yml` after Jellyfin has started once |
 
 ---
 
@@ -299,6 +299,22 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 ---
 
+### Jellyscope — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-jellyscope.yml` |
+| **In `deploy-services.yml`** | Yes (after Jellyfin) |
+| **Ansible sources** | `scripts/ensure_jellyfin_api_key.py`, `scripts/bootstrap_jellyscope.py` |
+| **`.env` keys** | `JELLYSCOPE_SECRET_KEY`, `JELLYSCOPE_ADMIN_USERNAME`, `JELLYSCOPE_ADMIN_PASSWORD` |
+| **Configured by Ansible** | Backs up `services/jellyscope/data/` before changes; reads or creates Jellyfin API key named `jellyscope` in `jellyfin.db`; bootstraps admin + Jellyfin URL/key in SQLite |
+| **Still in Compose only** | Traefik labels, Kuma labels, media mounts, image build |
+| **Still outside Ansible** | Scan cache (`imagecache/`), playback history in SQLite |
+| **Sign-up policy** | No public registration — `/setup` runs only when zero accounts exist; after bootstrap only admins add users in Settings |
+| **Fresh stand-up** | Set `.env` keys, run after `deploy-jellyfin.yml`. Wipe test: `rm -rf services/jellyscope/data/*` then re-run playbook |
+
+---
+
 ## Services without deploy playbooks (todo)
 
 Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sonarr/Radarr/Prowlarr/Bazarr) → **Seerr** → OIDC apps → rest.
@@ -342,7 +358,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 
 | Service | Compose only today | Config location | Suggested `deploy-*` scope |
 | --- | --- | --- | --- |
-| **Jellyscope** | ⬜ | `services/jellyscope/data/` | `deploy-jellyscope.yml` — `JELLYSCOPE_SECRET_KEY`, Jellyfin connection |
+| **Jellyscope** | ✅ | `services/jellyscope/data/` | `deploy-jellyscope.yml` — admin from `.env`, Jellyfin key auto-ensured |
 | **Sparky Fitness** | ⬜ | DB + uploads + Compose env | `deploy-sparkyfitness.yml` — DB passwords, auth secrets from `.env` (many keys already in `.env`) |
 | **Memos** | ✅ | `services/memos/secrets/` + SQLite | `deploy-memos.yml` — Authelia OIDC via `/etc/secrets` |
 | **McClean** | ⬜ | `services/mccleanengineering/data/` | `deploy-mcclean.yml` — `MCCLEAN_ADMIN_*` from `.env`. **If login fails after migration** with `readonly database`: stop container, delete `data.db-wal` + `data.db-shm`, restart |
@@ -363,7 +379,8 @@ Work top-to-bottom; each step should leave the stack usable.
 8. **Audiobookshelf / Mealie** — OIDC clients overlap with Authelia work
 9. ~~**Uptime Kuma + Autokuma**~~ — done (AutoKuma monitors from labels; Ansible syncs `/status/default` groups)
 10. ~~**Memos**~~ — done (Authelia OIDC via `/etc/secrets`)
-11. **Sparky Fitness / Jellyscope / McClean** — as needed
+11. ~~**Jellyscope**~~ — done (admin + Jellyfin key from Ansible)
+12. **Sparky Fitness / McClean** — as needed
 
 ---
 

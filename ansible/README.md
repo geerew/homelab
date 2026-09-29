@@ -40,6 +40,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
 | `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
+| `playbooks/deploy-jellyscope.yml` | Bootstrap Jellyscope admin + ensure Jellyfin API key; sync connection settings |
 | `playbooks/deploy-services.yml` | All deploy playbooks in dependency order (see below) |
 
 ## Usage
@@ -197,7 +198,7 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 
 | Service | `.env` variable |
 | --- | --- |
-| Jellyfin | `HOMEPAGE_JELLYFIN_API_KEY` |
+| Jellyfin | Auto — API key named `homepage` in `jellyfin.db` (see `deploy-homepage.yml`) |
 | Audiobookshelf | `HOMEPAGE_AUDIOBOOKSHELF_API_KEY` |
 | Mealie | `HOMEPAGE_MEALIE_API_KEY` |
 | Sonarr, Radarr, Prowlarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
@@ -279,6 +280,23 @@ Memos requires at least one user before the setup wizard clears. Ansible creates
 ```bash
 ansible-playbook playbooks/deploy-memos.yml
 # Restarts Memos when the secrets file changes
+```
+
+### Jellyscope
+
+Jellyscope has no OIDC — Authelia protects the edge only. Ansible backs up `services/jellyscope/data/`, reads or creates a dedicated Jellyfin API key named `jellyscope` in `jellyfin.db`, and creates/updates the instance admin from `.env`.
+
+| Setting | `.env` variable |
+| --- | --- |
+| Login cookie secret | `JELLYSCOPE_SECRET_KEY` |
+| Instance admin | `JELLYSCOPE_ADMIN_USERNAME` / `JELLYSCOPE_ADMIN_PASSWORD` |
+| UI language | `JELLYSCOPE_UI_LANGUAGE` (`en` default; Jellyscope’s built-in default is Czech) |
+
+Sign-up is not public: `/setup` only appears when the database has zero accounts. After bootstrap, only admins can add users in Settings.
+
+```bash
+ansible-playbook playbooks/deploy-jellyscope.yml
+# Run after deploy-jellyfin.yml
 ```
 
 ### qBittorrent WebUI
@@ -423,7 +441,7 @@ EPG is usually discovered automatically via XC. Do **not** share the raw `/outpu
 
 `deploy-jellyfin.yml` configures an **M3U tuner** pointing at Dispatcharr (`http://dispatcharr:9191/output/m3u/`). Dispatcharr exports `group-title` from the logical channel groups (EPL, TNT Sports, Sky Sports HD, Sky Sports SD). On first deploy the playbook removes the legacy HDHomeRun tuner, re-imports channels from M3U, and styles Dispatcharr's separator rows as section headers in the list CSS.
 
-Requires `JELLYFIN_API_KEY` in `.env` (Dashboard → API Keys) so the playbook can register the tuner and refresh channels.
+Requires Jellyfin to have run once (`jellyfin.db` exists). The playbook reads or creates an API key named `ansible` automatically — no manual Dashboard step.
 
 The Live TV channel list uses a list layout via custom CSS in `files/jellyfin/livetv-channels-list.css`. The rules target Jellyfin 12+ (`#liveTvPage` and `#channelsTab`, flex row cards). Tweak that file if logos or text overlap on your screen size.
 

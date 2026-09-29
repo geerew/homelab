@@ -1,0 +1,144 @@
+---
+- name: Deploy Jellyscope
+  hosts: localhost
+  gather_facts: true
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Jellyscope variables in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.JELLYSCOPE_SECRET_KEY is defined
+          - homelab_env.JELLYSCOPE_SECRET_KEY | length > 0
+          - homelab_env.JELLYSCOPE_ADMIN_USERNAME is defined
+          - homelab_env.JELLYSCOPE_ADMIN_USERNAME | length > 0
+          - homelab_env.JELLYSCOPE_ADMIN_PASSWORD is defined
+          - homelab_env.JELLYSCOPE_ADMIN_PASSWORD | length > 0
+        fail_msg: >-
+          Set JELLYSCOPE_SECRET_KEY, JELLYSCOPE_ADMIN_USERNAME, and JELLYSCOPE_ADMIN_PASSWORD
+          in {{ env_file }} (see .env.example).
+      when: not ansible_check_mode
+
+    - name: Check for existing Jellyscope data directory
+      ansible.builtin.stat:
+        path: "{{ data_dir }}/services/jellyscope/data"
+      register: jellyscope_data_stat
+
+    - name: Back up Jellyscope data before changes
+      ansible.builtin.copy:
+        src: "{{ data_dir }}/services/jellyscope/data/"
+        dest: "{{ data_dir }}/services/jellyscope.backup-{{ ansible_facts.date_time.iso8601_basic_short }}/data/"
+        remote_src: true
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: preserve
+      when:
+        - not ansible_check_mode
+        - jellyscope_data_stat.stat.exists
+        - jellyscope_data_stat.stat.isdir
+
+    - name: Ensure Jellyscope data directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/jellyscope/data"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Ensure Jellyfin API key for Jellyscope
+      ansible.builtin.import_tasks: ../tasks/ensure-jellyfin-api-key.yml
+      vars:
+        jellyfin_api_key_app_name: jellyscope
+
+    - name: Verify jellyscope key is listed in Jellyfin
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8096/Auth/Keys
+        headers:
+          Authorization: 'MediaBrowser Token="{{ jellyfin_api_key }}"'
+        return_content: true
+        status_code: 200
+      register: jellyfin_jellyscope_keys
+      failed_when: >-
+        jellyfin_jellyscope_keys.json.Items
+        | selectattr('AppName', 'equalto', 'jellyscope')
+        | list
+        | length == 0
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/bootstrap-jellyscope.yml
+
+    - name: Apply Jellyscope container configuration
+      ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: jellyscope
+
+    - name: Restart Jellyscope to load Jellyfin settings from database
+      community.docker.docker_container:
+        name: jellyscope
+        state: started
+        restart: true
+      when: not ansible_check_mode
+
+    - name: Wait for Jellyscope HTTP health
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - traefik_network
+          - curlimages/curl:latest
+          - -fsS
+          - http://jellyscope:8097/health
+      register: jellyscope_health_wait
+      until: jellyscope_health_wait.rc == 0
+      retries: 12
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Verify Jellyscope Jellyfin connection from API
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - traefik_network
+          - curlimages/curl:latest
+          - -fsS
+          - -H
+          - "Authorization: MediaBrowser Token={{ jellyfin_api_key }}"
+          - http://jellyfin:8096/System/Info/Public
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Verify Jellyscope instance profile
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - traefik_network
+          - curlimages/curl:latest
+          - -fsS
+          - http://jellyscope:8097/health
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Report Jellyscope deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to deploy Jellyscope from {{ env_file }}.
+          {% else %}
+          Jellyscope at https://tv-stats.{{ homelab_env.DOMAIN }}/ — admin '{{ homelab_env.JELLYSCOPE_ADMIN_USERNAME }}';
+          Jellyfin key '{{ jellyfin_api_key[:8] }}…' ensured in Jellyfin Dashboard and synced to Jellyscope
+          (Settings → Jellyfin shows the server URL; the API key field stays blank by design when configured).
+          Sign-up is disabled after first admin (/setup only runs once).
+          {% endif %}
