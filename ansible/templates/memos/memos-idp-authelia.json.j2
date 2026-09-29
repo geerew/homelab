@@ -1,0 +1,21 @@
+{
+  "uid": "authelia",
+  "name": "Authelia",
+  "type": "OAUTH2",
+  "identifierFilter": "",
+  "config": {
+    "oauth2Config": {
+      "clientId": "memos",
+      "clientSecret": "{{ homelab_env.OIDC_CLIENT_SECRET }}",
+      "authUrl": "https://auth.{{ homelab_env.DOMAIN }}/api/oidc/authorization",
+      "tokenUrl": "https://auth.{{ homelab_env.DOMAIN }}/api/oidc/token",
+      "userInfoUrl": "https://auth.{{ homelab_env.DOMAIN }}/api/oidc/userinfo",
+      "scopes": ["openid", "profile", "email"],
+      "fieldMapping": {
+        "identifier": "preferred_username",
+        "displayName": "given_name",
+        "email": "email"
+      }
+    }
+  }
+}

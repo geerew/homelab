@@ -1,0 +1,74 @@
+---
+- name: Deploy Memos
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Memos variables in .env
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DOMAIN is defined
+          - homelab_env.DOMAIN | length > 0
+          - homelab_env.OIDC_CLIENT_SECRET is defined
+          - homelab_env.OIDC_CLIENT_SECRET | length > 0
+          - homelab_env.MEMOS_ADMIN_USERNAME is defined
+          - homelab_env.MEMOS_ADMIN_USERNAME | length > 0
+          - homelab_env.MEMOS_ADMIN_PASSWORD is defined
+          - homelab_env.MEMOS_ADMIN_PASSWORD | length > 0
+        fail_msg: >-
+          Set DOMAIN, OIDC_CLIENT_SECRET, MEMOS_ADMIN_USERNAME, and MEMOS_ADMIN_PASSWORD
+          in {{ env_file }} (see .env.example).
+      when: not ansible_check_mode
+
+    - name: Ensure Memos secrets directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/memos/secrets"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0750"
+
+    - name: Render Memos deployment-managed config files
+      ansible.builtin.template:
+        src: "../templates/memos/{{ item.src }}"
+        dest: "{{ data_dir }}/services/memos/secrets/{{ item.dest }}"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0600"
+      loop:
+        - { src: memos-idp-authelia.json.j2, dest: memos-idp-authelia.json }
+        - { src: memos-instance-setting-general.json.j2, dest: memos-instance-setting-general.json }
+        - { src: memos-instance-setting-access.json.j2, dest: memos-instance-setting-access.json }
+      register: memos_secrets_config
+      no_log: true
+
+    - name: Apply Memos container configuration
+      ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: memos
+
+    - name: Restart Memos to pick up deployment-managed config
+      ansible.builtin.command:
+        cmd: docker compose restart memos
+        chdir: "{{ homelab_dir }}"
+      when:
+        - not ansible_check_mode
+        - memos_secrets_config.changed
+
+    - name: Bootstrap Memos host admin when database has no users
+      ansible.builtin.import_tasks: ../tasks/bootstrap-memos-admin.yml
+
+    - name: Report Memos deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to render Memos deployment config from {{ env_file }}.
+          {% elif memos_secrets_config.changed or (memos_bootstrap_admin is defined and memos_bootstrap_admin.changed) %}
+          Memos at https://notes.{{ homelab_env.DOMAIN }}/ — SSO enabled; admin account from {{ env_file }}.
+          {% else %}
+          Memos deployment config unchanged — no restart needed.
+          {% endif %}

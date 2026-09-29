@@ -34,6 +34,7 @@
     - wallos/db
     - wallos/logos
     - memos
+    - memos/secrets
     - sparkyfitness/db
     - sparkyfitness/backup
     - sparkyfitness/uploads

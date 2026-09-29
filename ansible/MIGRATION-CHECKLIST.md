@@ -283,6 +283,22 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 ---
 
+### Memos — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-memos.yml` |
+| **In `deploy-services.yml`** | Yes (after Autokuma) |
+| **Ansible sources** | `templates/memos/memos-idp-authelia.json.j2`, `memos-instance-setting-general.json.j2`, `memos-instance-setting-access.json.j2` |
+| **`.env` keys** | `DOMAIN`, `OIDC_CLIENT_SECRET`, `MEMOS_ADMIN_USERNAME`, `MEMOS_ADMIN_PASSWORD` |
+| **Configured by Ansible** | SSO-only login (`disallowPasswordAuth`), private access mode, Authelia OAuth2 IdP via `/etc/secrets`; instance admin bootstrapped from `.env` on first install; `MEMOS_INSTANCE_URL` in Compose |
+| **Still in Compose only** | Traefik labels, Kuma labels, image version |
+| **Still outside Ansible** | Memos, tags, attachments in SQLite (`memos_prod.db`); memo content and user accounts |
+| **Existing install note** | A UI-configured IdP with the same `uid` (`authelia`) is shadowed by the file and ignored at runtime. Remove the stored provider in Memos admin if you remove the secrets file later, or the old DB row will reappear. |
+| **Fresh stand-up** | Set `OIDC_CLIENT_SECRET`, `MEMOS_ADMIN_USERNAME`, and `MEMOS_ADMIN_PASSWORD`, run `deploy-authelia.yml` then `deploy-memos.yml`. Ansible creates the admin account on first install (skips setup wizard); main login shows Authelia SSO. Local admin: `https://notes.<domain>/auth/admin`. |
+
+---
+
 ## Services without deploy playbooks (todo)
 
 Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sonarr/Radarr/Prowlarr/Bazarr) → **Seerr** → OIDC apps → rest.
@@ -329,7 +345,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | --- | --- | --- | --- |
 | **Jellyscope** | ⬜ | `services/jellyscope/data/` | `deploy-jellyscope.yml` — `JELLYSCOPE_SECRET_KEY`, Jellyfin connection |
 | **Sparky Fitness** | ⬜ | DB + uploads + Compose env | `deploy-sparkyfitness.yml` — DB passwords, auth secrets from `.env` (many keys already in `.env`) |
-| **Memos** | ⬜ | `services/memos/` | `deploy-memos.yml` — low priority |
+| **Memos** | ✅ | `services/memos/secrets/` + SQLite | `deploy-memos.yml` — Authelia OIDC via `/etc/secrets` |
 | **McClean** | ⬜ | `services/mccleanengineering/data/` | `deploy-mcclean.yml` — `MCCLEAN_ADMIN_*` from `.env`. **If login fails after migration** with `readonly database`: stop container, delete `data.db-wal` + `data.db-shm`, restart |
 
 ---
@@ -347,7 +363,8 @@ Work top-to-bottom; each step should leave the stack usable.
 7. **Jellyfin** — libraries, OIDC, encoding (biggest remaining gap)
 8. **Audiobookshelf / Mealie / Wallos** — OIDC clients overlap with Authelia work
 9. ~~**Uptime Kuma + Autokuma**~~ — done (AutoKuma monitors from labels; Ansible syncs `/status/default` groups)
-10. **Sparky Fitness / Jellyscope / McClean / Memos** — as needed
+10. ~~**Memos**~~ — done (Authelia OIDC via `/etc/secrets`)
+11. **Sparky Fitness / Jellyscope / McClean** — as needed
 
 ---
 

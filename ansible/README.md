@@ -34,6 +34,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from templates, `.env`, and vars |
 | `playbooks/deploy-uptime-kuma.yml` | Start Uptime Kuma; wait for health |
 | `playbooks/deploy-autokuma.yml` | Start Autokuma; sync public status page groups via Kuma API |
+| `playbooks/deploy-memos.yml` | Render Memos Authelia OIDC config to `/etc/secrets`; apply Compose |
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
@@ -68,6 +69,9 @@ ansible-playbook playbooks/deploy-authelia.yml
 # Deploy Uptime Kuma + Autokuma (monitors from labels; status page from vars)
 ansible-playbook playbooks/deploy-uptime-kuma.yml
 ansible-playbook playbooks/deploy-autokuma.yml
+
+# Deploy Memos Authelia OIDC (shared OIDC_CLIENT_SECRET from .env)
+ansible-playbook playbooks/deploy-memos.yml
 
 # Deploy Dispatcharr (admin + M3U provider + EPL/sports channels)
 ansible-playbook playbooks/deploy-dispatcharr.yml
@@ -256,6 +260,26 @@ Only regenerate when deliberately rotating OIDC signing keys.
 ```bash
 ansible-playbook playbooks/deploy-authelia.yml
 # Restarts Authelia via docker compose when config changes
+```
+
+### Memos OIDC
+
+Memos 0.30+ loads login policy from deployment-managed JSON under `services/memos/secrets/` (mounted read-only at `/etc/secrets`). Ansible renders three files: Authelia IdP, SSO-only general settings (`disallowPasswordAuth: true`), and private access mode. The Authelia OIDC client definition lives in [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml).
+
+| Setting | Source |
+| --- | --- |
+| OAuth2 client ID / secret | `OIDC_CLIENT_SECRET` in `.env` (client id `memos`) |
+| Canonical URL | `MEMOS_INSTANCE_URL=https://notes.${DOMAIN}` in Compose |
+| IdP endpoints | `https://auth.${DOMAIN}/api/oidc/*` |
+| SSO-only login | `memos-instance-setting-general.json` (`disallowPasswordAuth: true`) |
+| Private instance | `memos-instance-setting-access.json` |
+| Instance admin | `MEMOS_ADMIN_USERNAME` / `MEMOS_ADMIN_PASSWORD` in `.env` (created on first install) |
+
+Memos requires at least one user before the setup wizard clears. Ansible creates the instance admin from `MEMOS_ADMIN_USERNAME` and `MEMOS_ADMIN_PASSWORD` on first install, then the main login page shows Authelia SSO. Local admin sign-in: `https://notes.${DOMAIN}/auth/admin`. Run after Authelia:
+
+```bash
+ansible-playbook playbooks/deploy-memos.yml
+# Restarts Memos when the secrets file changes
 ```
 
 ### qBittorrent WebUI

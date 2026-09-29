@@ -1,0 +1,74 @@
+---
+# Memos shows needsSetup=true (first-run wizard) until at least one user exists in SQLite.
+# SSO /etc/secrets config alone does not skip that gate in 0.31.
+- name: Check Memos SQLite database exists
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/memos/memos_prod.db"
+  register: memos_db_stat
+
+- name: Count Memos users
+  ansible.builtin.command:
+    argv:
+      - sqlite3
+      - "{{ data_dir }}/services/memos/memos_prod.db"
+      - SELECT COUNT(*) FROM user;
+  register: memos_user_count_raw
+  changed_when: false
+  when: memos_db_stat.stat.exists
+
+- name: Set Memos user count fact
+  ansible.builtin.set_fact:
+    memos_user_count: >-
+      {{ (memos_user_count_raw.stdout | default('0') | int)
+         if memos_db_stat.stat.exists else 0 }}
+  when: not ansible_check_mode
+
+- name: Wait for Memos HTTP API
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - container:memos
+      - curlimages/curl:latest
+      - -fsS
+      - http://127.0.0.1:5230/api/v1/instance/profile
+  register: memos_api_wait
+  until: memos_api_wait.rc == 0
+  retries: 12
+  delay: 5
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - memos_user_count | default(1) == 0
+
+- name: Bootstrap Memos host admin on first install
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - container:memos
+      - curlimages/curl:latest
+      - -sS
+      - -X
+      - POST
+      - http://127.0.0.1:5230/api/v1/users
+      - -H
+      - "Content-Type: application/json"
+      - -d
+      - "{{ memos_bootstrap_payload | to_json }}"
+  vars:
+    memos_bootstrap_payload:
+      username: "{{ homelab_env.MEMOS_ADMIN_USERNAME }}"
+      password: "{{ homelab_env.MEMOS_ADMIN_PASSWORD }}"
+      email: "{{ homelab_env.MEMOS_ADMIN_EMAIL | default(homelab_env.MEMOS_ADMIN_USERNAME ~ '@' ~ homelab_env.DOMAIN) }}"
+  register: memos_bootstrap_admin
+  changed_when: memos_bootstrap_admin.rc == 0
+  failed_when: memos_bootstrap_admin.rc != 0
+  no_log: true
+  when:
+    - not ansible_check_mode
+    - memos_user_count == 0

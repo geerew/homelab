@@ -488,8 +488,10 @@ services:
       - traefik_network
     environment:
       - TZ=${TZ}
+      - MEMOS_INSTANCE_URL=https://notes.${DOMAIN}
     volumes:
       - ${DATA_DIR}/services/memos:/var/opt/memos
+      - ${DATA_DIR}/services/memos/secrets:/etc/secrets:ro
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
