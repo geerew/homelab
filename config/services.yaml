@@ -1,0 +1,70 @@
+# Service registry for homelab CLI — compose names, deploy playbooks, stack groups.
+
+services:
+  watchtower:
+    deploy_playbook: deploy-watchtower.yml
+  cloudflare-ddns:
+    deploy_playbook: deploy-cloudflare-ddns.yml
+  socket-proxy:
+    deploy_playbook: deploy-socket-proxy.yml
+  traefik:
+    deploy_playbook: deploy-traefik.yml
+  authelia:
+    deploy_playbook: deploy-authelia.yml
+  uptime-kuma:
+    deploy_playbook: deploy-uptime-kuma.yml
+  autokuma:
+    deploy_playbook: deploy-autokuma.yml
+  dozzle:
+    deploy_playbook: deploy-dozzle.yml
+  mcclean:
+    deploy_playbook: null
+  homepage:
+    deploy_playbook: deploy-homepage.yml
+  jellyfin:
+    deploy_playbook: deploy-jellyfin.yml
+  jellyscope:
+    deploy_playbook: deploy-jellyscope.yml
+  audiobookshelf:
+    deploy_playbook: deploy-audiobookshelf.yml
+  mealie:
+    deploy_playbook: null
+  memos:
+    deploy_playbook: deploy-memos.yml
+  sparkyfitness-db:
+    deploy_playbook: null
+  sparkyfitness-server:
+    deploy_playbook: null
+  sparkyfitness-frontend:
+    deploy_playbook: null
+  seerr:
+    deploy_playbook: null
+  gluetun:
+    deploy_playbook: deploy-gluetun.yml
+    stack: gluetun_vpn
+  qbittorrent:
+    deploy_playbook: deploy-qbittorrent.yml
+    stack: gluetun_vpn
+  sonarr:
+    deploy_playbook: null
+    stack: gluetun_vpn
+  radarr:
+    deploy_playbook: null
+    stack: gluetun_vpn
+  prowlarr:
+    deploy_playbook: null
+    stack: gluetun_vpn
+  bazarr:
+    deploy_playbook: null
+    stack: gluetun_vpn
+  dispatcharr:
+    deploy_playbook: deploy-dispatcharr.yml
+
+stacks:
+  gluetun_vpn:
+    - gluetun
+    - qbittorrent
+    - sonarr
+    - radarr
+    - prowlarr
+    - bazarr

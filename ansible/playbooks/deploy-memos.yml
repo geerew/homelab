@@ -4,11 +4,11 @@
   gather_facts: false
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Memos variables in .env
+    - name: Validate Memos variables in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.DOMAIN is defined
@@ -21,7 +21,7 @@
           - homelab_env.MEMOS_ADMIN_PASSWORD | length > 0
         fail_msg: >-
           Set DOMAIN, OIDC_CLIENT_SECRET, MEMOS_ADMIN_USERNAME, and MEMOS_ADMIN_PASSWORD
-          in {{ env_file }} (see .env.example).
+          in {{ homelab_config_file }} (see homelab.example.yaml).
       when: not ansible_check_mode
 
     - name: Ensure Memos secrets directory exists
@@ -66,9 +66,9 @@
       ansible.builtin.debug:
         msg: >-
           {% if ansible_check_mode %}
-          Check mode: run without --check to render Memos deployment config from {{ env_file }}.
+          Check mode: run without --check to render Memos deployment config from {{ homelab_config_file }}.
           {% elif memos_secrets_config.changed or (memos_bootstrap_admin is defined and memos_bootstrap_admin.changed) %}
-          Memos at https://notes.{{ homelab_env.DOMAIN }}/ — SSO enabled; admin account from {{ env_file }}.
+          Memos at https://notes.{{ homelab_env.DOMAIN }}/ — SSO enabled; admin account from {{ homelab_config_file }}.
           {% else %}
           Memos deployment config unchanged — no restart needed.
           {% endif %}

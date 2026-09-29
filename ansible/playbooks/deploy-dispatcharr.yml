@@ -7,11 +7,11 @@
     - ../vars/dispatcharr_epl_channel_groups.yml
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Dispatcharr admin variables in .env
+    - name: Validate Dispatcharr admin variables in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.DISPATCHARR_ADMIN_USERNAME is defined
@@ -22,9 +22,9 @@
           - homelab_env.DISPATCHARR_ADMIN_EMAIL | length > 0
         fail_msg: >-
           Set DISPATCHARR_ADMIN_USERNAME, DISPATCHARR_ADMIN_PASSWORD, and
-          DISPATCHARR_ADMIN_EMAIL in {{ env_file }} (see .env.example).
+          DISPATCHARR_ADMIN_EMAIL in {{ homelab_config_file }} (see homelab.example.yaml).
 
-    - name: Validate Dispatcharr M3U variables in .env
+    - name: Validate Dispatcharr M3U variables in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.DISPATCHARR_M3U_NAME is defined
@@ -38,26 +38,26 @@
           - homelab_env.DISPATCHARR_M3U_REFRESH_INTERVAL | int >= 0
         fail_msg: >-
           Set DISPATCHARR_M3U_NAME, DISPATCHARR_M3U_URL, DISPATCHARR_M3U_USERNAME, and
-          DISPATCHARR_M3U_REFRESH_INTERVAL (hours; 0 = disabled) in {{ env_file }}
-          (see .env.example).
+          DISPATCHARR_M3U_REFRESH_INTERVAL (hours; 0 = disabled) in {{ homelab_config_file }}
+          (see homelab.example.yaml).
 
-    - name: Validate Dispatcharr M3U password in .env
+    - name: Validate Dispatcharr M3U password in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.DISPATCHARR_M3U_PASSWORD is defined
           - homelab_env.DISPATCHARR_M3U_PASSWORD | length > 0
         fail_msg: >-
-          Set DISPATCHARR_M3U_PASSWORD in {{ env_file }} before running this playbook.
+          Set DISPATCHARR_M3U_PASSWORD in {{ homelab_config_file }} before running this playbook.
       when: not ansible_check_mode
 
-    - name: Validate Dispatcharr XC password in .env
+    - name: Validate Dispatcharr XC password in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.DISPATCHARR_XC_PASSWORD is defined
           - homelab_env.DISPATCHARR_XC_PASSWORD | length > 0
           - homelab_env.DISPATCHARR_XC_PASSWORD is match('^[A-Za-z0-9._@-]+$')
         fail_msg: >-
-          Set DISPATCHARR_XC_PASSWORD in {{ env_file }} (letters, numbers, . _ @ - only; see .env.example).
+          Set DISPATCHARR_XC_PASSWORD in {{ homelab_config_file }} (letters, numbers, . _ @ - only; see homelab.example.yaml).
       when: not ansible_check_mode
 
     - name: Ensure Dispatcharr data directory exists

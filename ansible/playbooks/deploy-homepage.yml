@@ -14,11 +14,11 @@
       - kubernetes.yaml
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Homepage variables in .env
+    - name: Validate Homepage variables in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.DOMAIN is defined
@@ -42,8 +42,8 @@
           - homelab_env.HOMEPAGE_BAZARR_API_KEY is defined
           - homelab_env.HOMEPAGE_BAZARR_API_KEY | length > 0
         fail_msg: >-
-          Set DOMAIN, DISPATCHARR_ADMIN_*, and HOMEPAGE_* widget secrets in {{ env_file }}
-          (see .env.example). Jellyfin and Gluetun keys are automatic.
+          Set DOMAIN, DISPATCHARR_ADMIN_*, and HOMEPAGE_* widget secrets in {{ homelab_config_file }}
+          (see homelab.example.yaml). Jellyfin and Gluetun keys are automatic.
 
     - ansible.builtin.import_tasks: ../tasks/ensure-gluetun-api-key.yml
 

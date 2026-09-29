@@ -1,5 +1,5 @@
 ---
-- name: Resolve DATA_DIR from .env
+- name: Resolve DATA_DIR from homelab.yaml
   ansible.builtin.set_fact:
     data_dir: >-
       {{

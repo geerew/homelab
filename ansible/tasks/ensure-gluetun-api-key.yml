@@ -12,7 +12,7 @@
     path: "{{ data_dir }}/services/gluetun/control_api_key"
   register: gluetun_api_key_file
 
-- name: Migrate legacy Gluetun API key from .env
+- name: Migrate legacy Gluetun API key from homelab.yaml
   ansible.builtin.copy:
     dest: "{{ data_dir }}/services/gluetun/control_api_key"
     content: "{{ homelab_env.GLUETUN_API_KEY | trim }}\n"

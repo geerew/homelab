@@ -7,12 +7,11 @@
     - ../vars/authelia_oidc_clients.yml
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
-    - ansible.builtin.import_tasks: ../tasks/load-authelia-users.yml
 
   tasks:
-    - name: Validate Authelia secrets in .env
+    - name: Validate Authelia secrets in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.AUTHELIA_SESSION_SECRET is defined
@@ -25,35 +24,14 @@
           - homelab_env.AUTHELIA_OIDC_HMAC_SECRET | length > 0
           - homelab_env.DOMAIN is defined
           - homelab_env.DOMAIN | length > 0
-          - homelab_env.AUTHELIA_JWKS_FILE is defined
-          - homelab_env.AUTHELIA_JWKS_FILE | length > 0
+          - homelab_config.authelia.jwks_private_key is defined
+          - homelab_config.authelia.jwks_private_key | length > 0
+          - homelab_config.authelia.users is defined
+          - homelab_config.authelia.users | length > 0
         fail_msg: >-
-          Set AUTHELIA_SESSION_SECRET, AUTHELIA_JWT_SECRET, AUTHELIA_STORAGE_ENCRYPTION_KEY,
-          AUTHELIA_OIDC_HMAC_SECRET, AUTHELIA_JWKS_FILE, and DOMAIN in {{ env_file }}
-          (see .env.example).
+          Set authelia secrets, jwks_private_key, and users in {{ homelab_config_file }}
+          (see homelab.example.yaml).
       when: not ansible_check_mode
-
-    - name: Resolve Authelia JWKS file path
-      ansible.builtin.set_fact:
-        authelia_jwks_file: >-
-          {%- if homelab_env.AUTHELIA_JWKS_FILE.startswith('/') -%}
-          {{ homelab_env.AUTHELIA_JWKS_FILE }}
-          {%- else -%}
-          {{ homelab_dir }}/{{ homelab_env.AUTHELIA_JWKS_FILE | regex_replace('^\\.?/', '') }}
-          {%- endif -%}
-
-    - name: Check Authelia JWKS file exists
-      ansible.builtin.stat:
-        path: "{{ authelia_jwks_file }}"
-      register: authelia_jwks_file_stat
-
-    - name: Fail when Authelia JWKS file is missing
-      ansible.builtin.fail:
-        msg: >-
-          AUTHELIA_JWKS_FILE is set to {{ homelab_env.AUTHELIA_JWKS_FILE }} but
-          {{ authelia_jwks_file }} does not exist. Generate the OIDC signing key before first
-          deploy (see .env.example).
-      when: not authelia_jwks_file_stat.stat.exists
 
     - ansible.builtin.import_tasks: ../tasks/resolve-docker-network-subnets.yml
 
@@ -129,7 +107,7 @@
 
     - name: Restart Authelia to pick up config changes
       ansible.builtin.command:
-        cmd: docker compose restart authelia
+        cmd: python3 bin/homelab restart authelia
         chdir: "{{ homelab_dir }}"
       when:
         - not ansible_check_mode
@@ -141,7 +119,7 @@
           {% if ansible_check_mode %}
           Check mode: run without --check to render Authelia config.
           {% elif authelia_users_config.changed or authelia_configuration_config.changed %}
-          Deployed Authelia config from {{ authelia_users_file }} and {{ authelia_jwks_file }} and restarted Authelia.
+          Deployed Authelia config from {{ homelab_config_file }} and restarted Authelia.
           {% else %}
           Authelia config unchanged — no restart needed.
           {% endif %}

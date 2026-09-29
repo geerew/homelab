@@ -12,17 +12,17 @@
     jellyfin_api_key_app_name: ansible
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Jellyfin variables in .env
+    - name: Validate Jellyfin variables in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.DOMAIN is defined
           - homelab_env.DOMAIN | length > 0
         fail_msg: >-
-          Set DOMAIN in {{ env_file }} (see .env.example).
+          Set DOMAIN in {{ homelab_config_file }} (see homelab.example.yaml).
       when: not ansible_check_mode
 
     - ansible.builtin.import_tasks: ../tasks/ensure-jellyfin-api-key.yml

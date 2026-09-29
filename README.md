@@ -1,56 +1,87 @@
-# Docker Compose stack
+# Homelab Docker stack
 
-Single Compose file for Traefik, Authelia, media apps, and VPN-backed services (Gluetun, *arr, qBittorrent). Safe to version in Git: secrets and service data live in `.env` and local directories, not in the repo.
+Traefik, Authelia, media apps, and VPN-backed services (Gluetun, *arr, qBittorrent). Configuration lives in **`homelab.yaml`** (gitignored); Compose is rendered to **`compose.yaml`** (gitignored, contains secrets).
+
+## Prerequisites
+
+```bash
+sudo apt install python3-yaml ansible-core docker-compose-plugin
+cd ansible && ansible-galaxy collection install -r requirements.yml
+```
 
 ## Quick start
 
-1. **Copy env and set values**
+1. **Create config**
    ```bash
-   cp .env.example .env
+   cp homelab.example.yaml homelab.yaml
+   chmod 600 homelab.yaml
    ```
-   Edit `.env`: set `DATA_DIR` (path to this repo or your data root), `PUID`/`PGID`/`TZ`, and all secrets (Cloudflare, OIDC, WireGuard, Mealie OpenAI, media paths, etc.). See comments in `.env.example`.
+   Edit `homelab.yaml`: set `core.data_dir`, secrets under `authelia`, media paths, service sections, etc.
 
-2. **Traefik ACME file**
-   Ensure the ACME JSON file exists and has strict permissions (required for TLS):
+2. **Generate OIDC signing key** (first install only) — embed PEM in `authelia.jwks_private_key`:
    ```bash
-   mkdir -p "${DATA_DIR}/services/traefik/acme"
-   touch "${DATA_DIR}/services/traefik/acme/acme.json"
-   chmod 600 "${DATA_DIR}/services/traefik/acme/acme.json"
+   docker run --rm authelia/authelia:latest \
+     authelia crypto pair rsa generate --private-key -
    ```
-   If you use a different `DATA_DIR` in `.env`, run the same with that path.
+   Paste the output into `homelab.yaml` under `authelia.jwks_private_key` (YAML `|` block).
 
-3. **Start the stack**
-   From this directory (the one containing `compose.yaml`):
+3. **Traefik ACME file**
    ```bash
-   docker compose up -d
+   mkdir -p services/traefik/acme
+   touch services/traefik/acme/acme.json
+   chmod 600 services/traefik/acme/acme.json
    ```
-   Compose automatically loads `.env` from this directory; you do not need to `source` it.
+
+4. **Start the stack**
+   ```bash
+   ./bin/homelab up
+   ```
+   This runs `compose generate` then `docker compose up -d`.
+
+## Homelab CLI
+
+| Command | Description |
+| --- | --- |
+| `./bin/homelab config validate` | Check required keys in `homelab.yaml` |
+| `./bin/homelab compose generate` | Render `compose.tpl.yaml` → `compose.yaml` |
+| `./bin/homelab up [service...]` | Generate + start (expands Gluetun stack) |
+| `./bin/homelab stop/start/restart [service...]` | Service control |
+| `./bin/homelab deploy [service...]` | Ansible deploy playbooks |
+| `./bin/homelab deploy --all` | Full deploy order |
+| `./bin/homelab deploy SERVICE --check` | Dry-run deploy (no changes applied) |
+| `./bin/homelab deploy SERVICE --check --diff` | Preview compose + Ansible file diffs (compact output) |
+| `./bin/homelab deploy SERVICE --check -v` | Dry-run with full Ansible output including skipped tasks |
+
+Service names and deploy playbooks are defined in [`config/services.yaml`](config/services.yaml).
 
 ## Service data
 
-Service data (configs, databases, cache) lives under `services/` (gitignored). Ansible creates the directory tree on deploy; Compose bind-mounts from `${DATA_DIR}/services/<app>/`. Populate or restore from backup as needed.
+Configs and databases live under `services/` (gitignored). Ansible creates the tree on deploy; rendered Compose bind-mounts from `core.data_dir/services/<app>/`.
 
-## Changing the shared OIDC secret
+## Rotating the shared OIDC secret
 
-All Authelia OIDC clients (Audiobookshelf, Jellyfin, Mealie, Memos, Sparky Fitness) use the same client secret. To rotate it:
+1. Update `authelia.oidc_client_secret` in `homelab.yaml`.
+2. `./bin/homelab deploy authelia`
+3. `./bin/homelab up mealie sparkyfitness-server memos`
+4. Update Jellyfin and Audiobookshelf if needed (Ansible bootstrap syncs Audiobookshelf OIDC on deploy).
 
-1. Set the new plain secret in `.env` as `OIDC_CLIENT_SECRET`.
-2. Re-deploy Authelia (hashes the secret into `configuration.yml` for all clients):
+## Audiobookshelf volumes and libraries
 
-   ```bash
-   cd ansible && ansible-playbook playbooks/deploy-authelia.yml
-   ```
+In `homelab.yaml`:
 
-3. Restart apps that read `OIDC_CLIENT_SECRET` from Compose env: `docker compose up -d mealie sparkyfitness memos`.
-4. Update Jellyfin and Audiobookshelf in their own config/UIs to use the same new plain secret.
+```yaml
+audiobookshelf:
+  volumes:
+    - host: /mnt/audiobooks
+      container: /audiobooks
+    - host: /mnt/media2/Books
+      container: /books
+  libraries:
+    - name: Audiobooks
+      media_type: book
+      folders:
+        - /audiobooks/Books/AudioBooks
+        - /books/More
+```
 
-## Optional: Kuma health checks for *arr apps
-
-If your Sonarr/Radarr/Prowlarr/Bazarr require an API key in the status URL, set in `.env`:
-
-- `KUMA_SONARR_URL=http://gluetun:8989/api/v3/system/status?apiKey=YOUR_KEY`
-- `KUMA_RADARR_URL=...`
-- `KUMA_PROWLARR_URL=...`
-- `KUMA_BAZARR_URL=...`
-
-If unset, the compose file uses the same URLs without the query parameter (may work if the app allows unauthenticated status when restricted to localhost).
+Run `./bin/homelab compose generate` (or any `up`/`deploy`) after changes.

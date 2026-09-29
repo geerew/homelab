@@ -4,14 +4,14 @@
   gather_facts: false
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
     - ansible.builtin.import_tasks: ../tasks/ensure-service-dirs.yml
 
   tasks:
+    - ansible.builtin.import_tasks: ../tasks/ensure-compose-generated.yml
+
     - name: Deploy compose project
       community.docker.docker_compose_v2:
         project_src: "{{ homelab_dir }}"
-        env_files:
-          - "{{ env_file }}"
         state: present

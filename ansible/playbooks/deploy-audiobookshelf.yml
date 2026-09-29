@@ -1,0 +1,106 @@
+---
+- name: Deploy Audiobookshelf
+  hosts: localhost
+  gather_facts: true
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Audiobookshelf variables in homelab.yaml
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DOMAIN is defined
+          - homelab_env.DOMAIN | length > 0
+          - homelab_env.OIDC_CLIENT_SECRET is defined
+          - homelab_env.OIDC_CLIENT_SECRET | length > 0
+          - homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME is defined
+          - homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME | length > 0
+          - homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD is defined
+          - homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD | length > 0
+          - homelab_env.AUDIOBOOKSHELF_LIBRARIES is defined
+          - homelab_env.AUDIOBOOKSHELF_LIBRARIES | length > 0
+          - homelab_config.audiobookshelf.volumes is defined
+          - homelab_config.audiobookshelf.volumes | length > 0
+        fail_msg: >-
+          Set authelia.oidc_client_secret, audiobookshelf.root_*, libraries, and volumes
+          in {{ homelab_config_file }} (see homelab.example.yaml).
+
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: audiobookshelf
+        backup_service_src: "{{ data_dir }}/services/audiobookshelf/config"
+      when: not ansible_check_mode
+
+    - name: Ensure audiobookshelf data directories exist
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/audiobookshelf/{{ item }}"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+      loop:
+        - config
+        - metadata
+
+    - name: Fix root-owned audiobookshelf data (deploy only)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - -v
+          - "{{ data_dir }}/services/audiobookshelf:/data"
+          - alpine
+          - sh
+          - -c
+          - >-
+            mkdir -p /data/config /data/metadata &&
+            chown -R {{ homelab_env.PUID | default('1000') }}:{{ homelab_env.PGID | default('1000') }}
+            /data/config /data/metadata
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Regenerate compose.yaml with current volume mounts
+      ansible.builtin.command:
+        cmd: python3 bin/homelab compose generate
+        chdir: "{{ homelab_dir }}"
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: audiobookshelf
+
+    - name: Wait for Audiobookshelf HTTP health
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - traefik_network
+          - curlimages/curl:latest
+          - -fsS
+          - http://audiobookshelf:{{ homelab_env.AUDIOBOOKSHELF_PORT | default('13378') }}/status
+      register: audiobookshelf_health_wait
+      until: audiobookshelf_health_wait.rc == 0
+      retries: 18
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/preview-audiobookshelf-bootstrap.yml
+    - ansible.builtin.import_tasks: ../tasks/bootstrap-audiobookshelf.yml
+
+    - name: Report Audiobookshelf deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to deploy Audiobookshelf from {{ homelab_config_file }}.
+          {% else %}
+          Audiobookshelf at https://books.{{ homelab_env.DOMAIN }}/ —
+          root '{{ homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME }}' (break-glass local login);
+          Authelia OIDC enabled (auto-register on; login button "Login with Authelia").
+          {% endif %}

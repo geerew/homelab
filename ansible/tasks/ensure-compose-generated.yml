@@ -1,0 +1,7 @@
+---
+- name: Render compose.yaml from homelab.yaml
+  ansible.builtin.command:
+    cmd: python3 bin/homelab compose generate
+    chdir: "{{ homelab_dir }}"
+  changed_when: false
+  when: not ansible_check_mode

@@ -1,0 +1,158 @@
+core:
+  data_dir: .
+  puid: 1000
+  pgid: 1000
+  tz: Europe/London
+  domain: example.com
+  acme_email: admin@example.com
+socket_proxy:
+  log_level: warning
+  allow_start: '1'
+  allow_stop: '1'
+  allow_restarts: '1'
+  events: '1'
+  ping: '1'
+  version: '1'
+  auth: '0'
+  secrets: '0'
+  post: '1'
+  build: '0'
+  commit: '0'
+  configs: '0'
+  containers: '1'
+  distribution: '0'
+  exec: '0'
+  images: '1'
+  info: '1'
+  networks: '1'
+  nodes: '0'
+  plugins: '0'
+  services: '1'
+  session: '0'
+  swarm: '0'
+  system: '0'
+  tasks: '1'
+  volumes: '1'
+  disable_ipv6: '0'
+watchtower:
+  cleanup: 'true'
+  poll_interval: '86400'
+  label_enable: 'true'
+dozzle:
+  level: info
+  filter: status=running
+  remote_host: tcp://socket-proxy:2375
+  auth_provider: forward-proxy
+  auth_header_user: Remote-User
+cloudflare:
+  api_token: ''
+  ddns_domains: ''
+  ddns_proxied: 'true'
+  ddns_detection_mode: cloudflare.trace
+  ddns_http_timeout: 10s
+authelia:
+  session_secret: ''
+  jwt_secret: ''
+  storage_encryption_key: ''
+  oidc_hmac_secret: ''
+  oidc_client_secret: ''
+  jwks_private_key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    ...
+    -----END RSA PRIVATE KEY-----
+  users:
+    admin:
+      display_name: Admin
+      email: admin@example.com
+      password: changeme
+      groups:
+      - admins
+memos:
+  admin_username: admin
+  admin_password: ''
+  admin_email: ''
+sparkyfitness:
+  db_password: ''
+  app_db_password: ''
+  encryption_key: ''
+  better_auth: ''
+  jwt_secret: ''
+mealie:
+  openai_api_key: ''
+gluetun:
+  api_key: ''
+  vpn_service_provider: mullvad
+  vpn_type: wireguard
+  wireguard_private_key: ''
+  wireguard_addresses: ''
+  server_cities: ''
+  dot: 'off'
+  dns_address: 10.64.0.1
+  firewall_outbound_subnets: 192.168.90.0/24
+  ports:
+    httpproxy: 8888
+    control_server: 8080
+    sonarr: 8989
+    radarr: 7878
+    prowlarr: 9696
+    bazarr: 6767
+    qbittorrent_webui: 9865
+qbittorrent:
+  webui_username: admin
+  webui_password: ''
+  lan_auth_bypass: 'true'
+media:
+  media1_dir: /mnt/media1
+  media2_dir: /mnt/media2
+  audiobooks_dir: /mnt/audiobooks
+  downloads_dir: /downloads
+audiobookshelf:
+  volumes:
+  - host: /mnt/audiobooks
+    container: /audiobooks
+  root_username: admin
+  root_password: ''
+  libraries:
+  - name: Audiobooks
+    media_type: book
+    provider: audible.uk  # Audible.co.uk (also: audible, audible.de, …)
+    settings:
+      coverAspectRatio: 1  # 1 = square covers, 0 = standard
+      disableWatcher: false  # false = automatically watch library for changes
+    folders:
+    - /audiobooks/Books/AudioBooks
+uptime_kuma:
+  bazarr_url: ''
+  sonarr_url: ''
+  radarr_url: ''
+  prowlarr_url: ''
+  dispatcharr_url: ''
+jellyscope:
+  admin_username: admin
+  admin_password: ''
+  secret_key: ''
+homepage:
+  audiobookshelf_api_key: ''
+  mealie_api_key: ''
+  sonarr_api_key: ''
+  radarr_api_key: ''
+  prowlarr_api_key: ''
+  seerr_api_key: ''
+  bazarr_api_key: ''
+mcclean:
+  admin_username: admin
+  admin_password: ''
+dispatcharr:
+  admin_username: admin
+  admin_password: ''
+  admin_email: ''
+  trusted_proxies: none
+  setup_allowed_ip: 127.0.0.1
+  m3u_name: ''
+  m3u_url: ''
+  m3u_username: ''
+  m3u_password: ''
+  m3u_account_type: XC
+  m3u_max_streams: 1
+  m3u_refresh_interval: 24
+  xc_password: ''

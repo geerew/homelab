@@ -4,11 +4,11 @@
   gather_facts: false
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Gluetun settings in .env
+    - name: Validate Gluetun settings in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.VPN_SERVICE_PROVIDER is defined
@@ -26,7 +26,7 @@
           - homelab_env.FIREWALL_OUTBOUND_SUBNETS is defined
           - homelab_env.FIREWALL_OUTBOUND_SUBNETS | length > 0
         fail_msg: >-
-          Set Gluetun VPN variables in {{ env_file }} (see .env.example):
+          Set Gluetun VPN variables in {{ homelab_config_file }} (see homelab.example.yaml):
           VPN_SERVICE_PROVIDER, VPN_TYPE, WIREGUARD_PRIVATE_KEY, WIREGUARD_ADDRESSES,
           SERVER_CITIES, GLUETUN_DNS_ADDRESS, FIREWALL_OUTBOUND_SUBNETS.
       when: not ansible_check_mode

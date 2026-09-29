@@ -4,11 +4,11 @@
   gather_facts: true
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Jellyscope variables in .env
+    - name: Validate Jellyscope variables in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.JELLYSCOPE_SECRET_KEY is defined
@@ -19,13 +19,14 @@
           - homelab_env.JELLYSCOPE_ADMIN_PASSWORD | length > 0
         fail_msg: >-
           Set JELLYSCOPE_SECRET_KEY, JELLYSCOPE_ADMIN_USERNAME, and JELLYSCOPE_ADMIN_PASSWORD
-          in {{ env_file }} (see .env.example).
+          in {{ homelab_config_file }} (see homelab.example.yaml).
       when: not ansible_check_mode
 
-    - ansible.builtin.import_tasks: ../tasks/backup-service-data.yml
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
       vars:
         backup_service_name: jellyscope
         backup_service_src: "{{ data_dir }}/services/jellyscope/data"
+      when: not ansible_check_mode
 
     - name: Ensure Jellyscope data directory exists
       ansible.builtin.file:
@@ -122,7 +123,7 @@
       ansible.builtin.debug:
         msg: >-
           {% if ansible_check_mode %}
-          Check mode: run without --check to deploy Jellyscope from {{ env_file }}.
+          Check mode: run without --check to deploy Jellyscope from {{ homelab_config_file }}.
           {% else %}
           Jellyscope at https://tv-stats.{{ homelab_env.DOMAIN }}/ — admin '{{ homelab_env.JELLYSCOPE_ADMIN_USERNAME }}';
           Jellyfin key '{{ jellyfin_api_key[:8] }}…' ensured in Jellyfin Dashboard and synced to Jellyscope

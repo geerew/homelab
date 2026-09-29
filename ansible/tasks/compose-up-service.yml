@@ -1,9 +1,9 @@
 ---
+- ansible.builtin.import_tasks: ensure-compose-generated.yml
+
 - name: "Apply {{ compose_service }} container configuration"
   community.docker.docker_compose_v2:
     project_src: "{{ homelab_dir }}"
-    env_files:
-      - "{{ env_file }}"
     services:
       - "{{ compose_service }}"
     state: present

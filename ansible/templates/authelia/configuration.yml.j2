@@ -65,7 +65,7 @@ identity_providers:
 
     jwks:
       - key: |
-{{ lookup('file', authelia_jwks_file) | indent(10, true) }}
+{{ homelab_config.authelia.jwks_private_key | indent(10, true) }}
 
     claims_policies:
       sparkyfitness:

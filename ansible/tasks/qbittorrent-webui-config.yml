@@ -3,7 +3,7 @@
   ansible.builtin.set_fact:
     qbittorrent_lan_auth_bypass: "{{ homelab_env.QBITTORRENT_LAN_AUTH_BYPASS | default('true') | bool }}"
 
-- name: Validate qBittorrent WebUI credentials in .env
+- name: Validate qBittorrent WebUI credentials in homelab.yaml
   ansible.builtin.assert:
     that:
       - homelab_env.QBITTORRENT_WEBUI_USERNAME is defined
@@ -11,8 +11,8 @@
       - homelab_env.QBITTORRENT_WEBUI_PASSWORD is defined
       - homelab_env.QBITTORRENT_WEBUI_PASSWORD | length > 0
     fail_msg: >-
-      Set QBITTORRENT_WEBUI_USERNAME and QBITTORRENT_WEBUI_PASSWORD in {{ env_file }}.
-      Required for Sonarr/Radarr/Prowlarr download-client API access (see .env.example).
+      Set QBITTORRENT_WEBUI_USERNAME and QBITTORRENT_WEBUI_PASSWORD in {{ homelab_config_file }}.
+      Required for Sonarr/Radarr/Prowlarr download-client API access (see homelab.example.yaml).
   when: not ansible_check_mode
 
 - name: Resolve qBittorrent WebUI password PBKDF2 hash

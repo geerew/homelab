@@ -1,0 +1,37 @@
+---
+- name: Bootstrap Audiobookshelf root user, OIDC, and libraries
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - -v
+      - "{{ playbook_dir }}/../scripts/bootstrap_audiobookshelf.py:/bootstrap_audiobookshelf.py:ro"
+      - -e
+      - ABS_URL=http://audiobookshelf:{{ homelab_env.AUDIOBOOKSHELF_PORT | default('13378') }}
+      - -e
+      - DOMAIN={{ homelab_env.DOMAIN }}
+      - -e
+      - OIDC_CLIENT_SECRET={{ homelab_env.OIDC_CLIENT_SECRET }}
+      - -e
+      - AUDIOBOOKSHELF_ROOT_USERNAME={{ homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME }}
+      - -e
+      - AUDIOBOOKSHELF_ROOT_PASSWORD={{ homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD }}
+      - -e
+      - AUDIOBOOKSHELF_LIBRARIES={{ homelab_env.AUDIOBOOKSHELF_LIBRARIES }}
+      - python:3-alpine
+      - python
+      - /bootstrap_audiobookshelf.py
+  register: audiobookshelf_bootstrap
+  changed_when: >-
+    'initialized server' in audiobookshelf_bootstrap.stdout
+    or 'updated OIDC settings' in audiobookshelf_bootstrap.stdout
+    or 'updated server settings' in audiobookshelf_bootstrap.stdout
+    or 'created library' in audiobookshelf_bootstrap.stdout
+    or 'updated library' in audiobookshelf_bootstrap.stdout
+    or 'added ' in audiobookshelf_bootstrap.stdout
+    or 'triggered scan' in audiobookshelf_bootstrap.stdout
+  no_log: true
+  when: not ansible_check_mode

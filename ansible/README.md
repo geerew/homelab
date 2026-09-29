@@ -1,18 +1,20 @@
 # Homelab Ansible
 
-Ansible playbooks for deploying and bootstrapping the homelab stack. **Secrets stay in `.env`** (gitignored); nothing sensitive is stored in this directory.
+Ansible playbooks for deploying and bootstrapping the homelab stack. **Secrets stay in `homelab.yaml`** (gitignored at repo root); nothing sensitive is stored in this directory.
+
+Prefer the **`homelab` CLI** from the repo root (`./bin/homelab deploy …`) — it renders `compose.yaml` before running playbooks.
 
 For a per-service migration tracker (what's done, what's todo, suggested order), see **[MIGRATION-CHECKLIST.md](MIGRATION-CHECKLIST.md)**.
 
 ## Prerequisites
 
 ```bash
-sudo apt install ansible-core   # or pip install ansible
+sudo apt install python3-yaml ansible-core
 cd ansible
 ansible-galaxy collection install -r requirements.yml
 ```
 
-Ensure `.env` exists at the repo root (copy from `.env.example`).
+Ensure `homelab.yaml` exists at the repo root (copy from `homelab.example.yaml`).
 
 Optional: override the repo path when running from elsewhere:
 
@@ -31,10 +33,11 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-dozzle.yml` | Validate Dozzle `.env` settings and apply container config |
 | `playbooks/deploy-traefik.yml` | Render Traefik static config + Authelia forward-auth middleware |
 | `playbooks/deploy-cloudflare-ddns.yml` | Validate Cloudflare DDNS `.env` settings and apply container config |
-| `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from templates, `.env`, and vars |
+| `playbooks/deploy-authelia.yml` | Render Authelia `users.yml` + `configuration.yml` from `homelab.yaml` and vars |
 | `playbooks/deploy-uptime-kuma.yml` | Start Uptime Kuma; wait for health |
 | `playbooks/deploy-autokuma.yml` | Start Autokuma; sync public status page groups via Kuma API |
 | `playbooks/deploy-memos.yml` | Render Memos Authelia OIDC config to `/etc/secrets`; apply Compose |
+| `playbooks/deploy-audiobookshelf.yml` | Media mounts, libraries, Authelia OIDC bootstrap; backs up config + metadata |
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
@@ -51,7 +54,7 @@ From the `ansible/` directory:
 # Deploy everything
 ansible-playbook playbooks/site.yml
 
-# Deploy infrastructure services from .env
+# Deploy infrastructure services (reads homelab.yaml)
 ansible-playbook playbooks/deploy-socket-proxy.yml
 ansible-playbook playbooks/deploy-watchtower.yml
 
@@ -73,6 +76,9 @@ ansible-playbook playbooks/deploy-autokuma.yml
 
 # Deploy Memos Authelia OIDC (shared OIDC_CLIENT_SECRET from .env)
 ansible-playbook playbooks/deploy-memos.yml
+
+# Deploy Audiobookshelf (media mounts, libraries, Authelia OIDC)
+ansible-playbook playbooks/deploy-audiobookshelf.yml
 
 # Deploy Dispatcharr (admin + M3U provider + EPL/sports channels)
 ansible-playbook playbooks/deploy-dispatcharr.yml
@@ -208,51 +214,46 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Gluetun | Auto — control API key in `services/gluetun/control_api_key` (see `deploy-gluetun.yml`) |
 | Gluetun VPN | `VPN_SERVICE_PROVIDER`, `VPN_TYPE`, `WIREGUARD_*`, `SERVER_CITIES`, `GLUETUN_DNS_ADDRESS`, `FIREWALL_OUTBOUND_SUBNETS` |
 
-Gluetun VPN settings are read from `.env` by Compose. Ansible auto-generates the HTTP control-server API key, writes `services/gluetun/compose.env` for Compose, and renders `config.toml` (gitignored) for Homepage widget auth.
+Gluetun VPN settings are in `homelab.yaml` under `gluetun:` and baked into rendered `compose.yaml`. Ansible auto-generates the HTTP control-server API key to `services/gluetun/control_api_key` if unset, and renders `config.toml` (gitignored) for Homepage widget auth.
 
 ### Authelia
 
-Authelia config is split across `.env`, gitignored files, and committed Ansible sources:
+Authelia config is rendered from **`homelab.yaml`** (repo root, gitignored) plus committed Ansible sources:
 
 | Output | Source |
 | --- | --- |
-| `services/authelia/config/users.yml` | `authelia-users.yml` (repo root, gitignored) → [`templates/authelia/users.yml.j2`](templates/authelia/users.yml.j2) |
-| `services/authelia/config/configuration.yml` | [`templates/authelia/configuration.yml.j2`](templates/authelia/configuration.yml.j2) + `.env` + [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml) + PEM at `AUTHELIA_JWKS_FILE` |
+| `services/authelia/config/users.yml` | `authelia.users` in `homelab.yaml` → [`templates/authelia/users.yml.j2`](templates/authelia/users.yml.j2) |
+| `services/authelia/config/configuration.yml` | [`templates/authelia/configuration.yml.j2`](templates/authelia/configuration.yml.j2) + `homelab.yaml` + [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml) |
 
 Do not edit `users.yml` or `configuration.yml` directly — changes will be overwritten on the next deploy.
 
-**Users** — copy `authelia-users.example.yml` → `authelia-users.yml`:
+**Users** — under `authelia.users` in `homelab.yaml`:
 
 ```yaml
-users:
-  mike:
-    display_name: Mike
-    email: mike@example.com
-    password: your-plain-password
-    groups:
-      - admins
+authelia:
+  users:
+    mike:
+      display_name: Mike
+      email: mike@example.com
+      password: your-plain-password
+      groups:
+        - admins
 ```
 
-Use `password:` for plain text (Ansible hashes with argon2 at deploy time), or `password_hash:` to keep an existing hash until you set a new password.
+Use `password:` for plain text (Ansible hashes with argon2 at deploy time), or `password_hash:` to keep an existing hash.
 
-**Secrets in `.env`** (migrate from your existing `configuration.yml` on first run):
+**Secrets in `homelab.yaml`** under `authelia:`:
 
-| Variable | Purpose |
+| Key | Purpose |
 | --- | --- |
-| `AUTHELIA_SESSION_SECRET` | Session cookie signing |
-| `AUTHELIA_JWT_SECRET` | Password-reset token signing |
-| `AUTHELIA_STORAGE_ENCRYPTION_KEY` | Encrypts `db.sqlite3` — **never change** unless you accept data loss |
-| `AUTHELIA_OIDC_HMAC_SECRET` | OIDC HMAC |
-| `OIDC_CLIENT_SECRET` | Plain secret shared by all OIDC apps; PBKDF2-hashed into `configuration.yml` at deploy |
+| `session_secret` | Session cookie signing |
+| `jwt_secret` | Password-reset token signing |
+| `storage_encryption_key` | Encrypts `db.sqlite3` — **never change** unless you accept data loss |
+| `oidc_hmac_secret` | OIDC HMAC |
+| `oidc_client_secret` | Plain secret shared by all OIDC apps |
+| `jwks_private_key` | RSA PEM block (`\|` multiline) for OIDC token signing |
 
-**OIDC signing key (`AUTHELIA_JWKS_FILE`)** — path in `.env` to an RSA private key PEM (default `./authelia-jwks.pem`, gitignored). Authelia uses it to sign OIDC tokens for Mealie/Jellyfin/etc. Deploy fails if the var is unset or the file is missing. Ansible embeds the PEM into `configuration.yml` but never generates it — create once before first deploy:
-
-```bash
-docker run --rm -v "$PWD:/out" authelia/authelia:latest \
-  authelia crypto pair rsa generate -d /out --file.private-key authelia-jwks.pem
-```
-
-Only regenerate when deliberately rotating OIDC signing keys.
+Generate a JWKS PEM once and paste into `authelia.jwks_private_key` (see root [README.md](../README.md)).
 
 **OIDC clients** — structure (redirect URIs, scopes, etc.) lives in [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml). Active clients: Audiobookshelf, Jellyfin, Mealie, Memos, Sparky Fitness.
 
@@ -282,6 +283,19 @@ Memos requires at least one user before the setup wizard clears. Ansible creates
 ansible-playbook playbooks/deploy-memos.yml
 # Restarts Memos when the secrets file changes
 ```
+
+### Audiobookshelf
+
+Audiobookshelf uses in-app Authelia OIDC (Traefik does not forward-auth the app). Ansible backs up `services/audiobookshelf/config/` before changes, regenerates `compose.yaml` (volume mounts from `homelab.yaml`), and bootstraps via API.
+
+| Setting | Source in `homelab.yaml` |
+| --- | --- |
+| Media bind mounts | `audiobookshelf.volumes` — list of `host` / `container` |
+| Libraries + folder paths | `audiobookshelf.libraries` — folder paths use **container** paths |
+| Break-glass root login | `audiobookshelf.root_username` / `root_password` |
+| OIDC client secret | `authelia.oidc_client_secret` (client id `audiobookshelf`) |
+
+Run after Authelia: `./bin/homelab deploy audiobookshelf` (or `ansible-playbook playbooks/deploy-audiobookshelf.yml`).
 
 ### Jellyscope
 
@@ -354,14 +368,21 @@ Compose and Ansible now expect data under `services/`. **Do not restart the stac
 
 ### Dry run (`--check`)
 
-Preview Compose changes without applying them:
+Prefer the homelab CLI from the repo root:
 
 ```bash
-ansible-playbook playbooks/site.yml --check
-ansible-playbook playbooks/site.yml --check --diff   # show config diffs where supported
+./bin/homelab deploy audiobookshelf --check --diff   # compose.yaml preview + Ansible template diffs
+./bin/homelab deploy authelia --check --diff
 ```
 
-Deploy playbooks (`deploy-*.yml`) are not fully simulatable in check mode — Docker exec steps are skipped. Use `--check` on `site.yml` only; run deploy playbooks for real when testing app setup.
+Or run Ansible directly:
+
+```bash
+ansible-playbook playbooks/site.yml --check --diff
+ansible-playbook playbooks/deploy-authelia.yml --check --diff
+```
+
+Backups and Docker/API bootstrap steps are skipped in check mode. Template and `file` tasks (e.g. Authelia config, Homepage YAML, service data dirs) still run with `--diff` so you can preview changes even on a fresh install with no backup dir yet.
 
 ### Reset app data for bootstrap testing
 
@@ -448,7 +469,7 @@ The Live TV channel list uses a list layout via custom CSS in `files/jellyfin/li
 
 ## Notes
 
-- Playbooks use `community.docker.docker_compose_v2` and pass your `.env` file to Compose.
+- Playbooks use `community.docker.docker_compose_v2` against rendered `compose.yaml` (see `tasks/ensure-compose-generated.yml`).
 - Dispatcharr bootstrap waits on `http://127.0.0.1:9191` (published on the dispatcharr container).
 - Web signup is disabled (`DISPATCHARR_SETUP_ALLOWED_IP=127.0.0.1`). Run `deploy-dispatcharr.yml` after `site.yml`.
 - Starting Gluetun always includes all `network_mode: service:gluetun` sidecars (Sonarr, Radarr, etc.) so a Gluetun recreate cannot orphan them.

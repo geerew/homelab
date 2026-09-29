@@ -1,0 +1,21 @@
+---
+# Check-mode summary of what bootstrap_audiobookshelf.py would apply (no API calls).
+
+- name: Build Audiobookshelf bootstrap preview
+  ansible.builtin.set_fact:
+    audiobookshelf_bootstrap_preview:
+      url: "http://audiobookshelf:{{ homelab_env.AUDIOBOOKSHELF_PORT | default('13378') }}"
+      root_user: "{{ homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME }}"
+      oidc_client: audiobookshelf
+      oidc_issuer: "https://auth.{{ homelab_env.DOMAIN }}"
+      group_claim: groups
+      server_settings:
+        - storeCoverWithItem
+        - storeMetadataWithItem
+      libraries: "{{ homelab_env.AUDIOBOOKSHELF_LIBRARIES | from_json }}"
+  when: ansible_check_mode
+
+- name: Preview Audiobookshelf bootstrap (check mode)
+  ansible.builtin.debug:
+    var: audiobookshelf_bootstrap_preview
+  when: ansible_check_mode

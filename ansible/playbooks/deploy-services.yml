@@ -14,7 +14,8 @@
 #   7. Uptime Kuma      — status dashboard; public page slug `default` for Homepage widget
 #   8. Autokuma         — creates monitors from Compose kuma.* labels; syncs status page groups
 #   9. Memos             — Authelia OIDC via deployment-managed /etc/secrets
-#  10. Gluetun          — VPN gateway; Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent share its network
+#  10. Audiobookshelf   — media mounts, libraries, Authelia OIDC via API bootstrap
+#  11. Gluetun          — VPN gateway; Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent share its network
 #  11. Dispatcharr      — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
 #  12. qBittorrent      — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
 #  13. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
@@ -47,6 +48,9 @@
 
 - name: Deploy Memos
   ansible.builtin.import_playbook: deploy-memos.yml
+
+- name: Deploy Audiobookshelf
+  ansible.builtin.import_playbook: deploy-audiobookshelf.yml
 
 - name: Deploy Gluetun
   ansible.builtin.import_playbook: deploy-gluetun.yml

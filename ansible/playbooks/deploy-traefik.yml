@@ -4,11 +4,11 @@
   gather_facts: false
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Traefik settings in .env
+    - name: Validate Traefik settings in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.DOMAIN is defined
@@ -18,7 +18,7 @@
           - homelab_env.CLOUDFLARE_API_TOKEN is defined
           - homelab_env.CLOUDFLARE_API_TOKEN | length > 0
         fail_msg: >-
-          Set DOMAIN, ACME_EMAIL, and CLOUDFLARE_API_TOKEN in {{ env_file }} (see .env.example).
+          Set DOMAIN, ACME_EMAIL, and CLOUDFLARE_API_TOKEN in {{ homelab_config_file }} (see homelab.example.yaml).
       when: not ansible_check_mode
 
     - name: Ensure Traefik config directories exist

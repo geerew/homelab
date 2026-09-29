@@ -7,7 +7,7 @@
     - ../vars/uptime_kuma_status_page.yml
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
@@ -41,7 +41,7 @@
       ansible.builtin.debug:
         msg: >-
           {% if ansible_check_mode %}
-          Check mode: run without --check to apply Uptime Kuma from {{ env_file }}.
+          Check mode: run without --check to apply Uptime Kuma from {{ homelab_config_file }}.
           {% else %}
           Uptime Kuma running at https://status.{{ homelab_env.DOMAIN }}/
           (dashboard auth disabled; Authelia at edge; public page /status/{{ uptime_kuma_status_page_slug }}).

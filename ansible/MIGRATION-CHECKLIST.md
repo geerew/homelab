@@ -88,7 +88,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | `site.yml` | `ensure-service-dirs` + `docker compose up` | 🔧 Done |
 | `ensure-service-dirs.yml` | Create `services/*` volume tree | 🔧 Done |
 | `deploy-services.yml` | Orchestrates all `deploy-*` app playbooks | 🔧 Done (grows as you add playbooks) |
-| `tasks/load-env.yml` | Parse repo `.env` → `homelab_env` | 🔧 Done |
+| `tasks/load-homelab-config.yml` | Load `homelab.yaml` → `homelab_config` + flat `homelab_env` | ✅ Done |
 | `tasks/resolve-data-dir.yml` | Resolve `DATA_DIR` | 🔧 Done |
 | `tasks/start-gluetun-stack.yml` | Restart gluetun + VPN sidecars together | 🔧 Done |
 
@@ -351,7 +351,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 
 | Service | Compose only today | Config location | Suggested `deploy-*` scope |
 | --- | --- | --- | --- |
-| **Audiobookshelf** | ⬜ | `services/audiobookshelf/config/` | `deploy-audiobookshelf.yml` — libraries from `AUDIOBOOKS_DIR`, OIDC |
+| **Audiobookshelf** | ✅ | `homelab.yaml` + `services/audiobookshelf/config/` | `deploy-audiobookshelf.yml` — backups, volumes/libraries in yaml, OIDC bootstrap |
 | **Mealie** | ⬜ | `services/mealie/data/` | `deploy-mealie.yml` — OIDC, OpenAI key from `.env`, default group |
 
 ### Other apps

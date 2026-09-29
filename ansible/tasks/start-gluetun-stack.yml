@@ -1,11 +1,11 @@
 ---
 # All services sharing gluetun's network namespace must be started together.
 # If gluetun is recreated alone, sidecars keep pointing at the old container.
+- ansible.builtin.import_tasks: ensure-compose-generated.yml
+
 - name: Start Gluetun VPN stack
   community.docker.docker_compose_v2:
     project_src: "{{ homelab_dir }}"
-    env_files:
-      - "{{ env_file }}"
     services:
       - gluetun
       - qbittorrent

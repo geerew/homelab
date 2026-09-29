@@ -4,11 +4,11 @@
   gather_facts: false
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Watchtower settings in .env
+    - name: Validate Watchtower settings in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env.WATCHTOWER_CLEANUP is defined
@@ -17,7 +17,7 @@
           - homelab_env.WATCHTOWER_POLL_INTERVAL | string | length > 0
           - homelab_env.WATCHTOWER_LABEL_ENABLE is defined
           - homelab_env.WATCHTOWER_LABEL_ENABLE | string | length > 0
-        fail_msg: Set WATCHTOWER_* variables in {{ env_file }} (see .env.example).
+        fail_msg: Set WATCHTOWER_* variables in {{ homelab_config_file }} (see homelab.example.yaml).
       when: not ansible_check_mode
 
     - name: Apply Watchtower container configuration
@@ -29,7 +29,7 @@
       ansible.builtin.debug:
         msg: >-
           {% if ansible_check_mode %}
-          Check mode: run without --check to apply Watchtower settings from {{ env_file }}.
+          Check mode: run without --check to apply Watchtower settings from {{ homelab_config_file }}.
           {% else %}
           Watchtower running (poll every {{ homelab_env.WATCHTOWER_POLL_INTERVAL }}s,
           label enable={{ homelab_env.WATCHTOWER_LABEL_ENABLE }},

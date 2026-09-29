@@ -1,5 +1,5 @@
 ---
-# OIDC client structure for Authelia — secrets come from OIDC_CLIENT_SECRET in .env.
+# OIDC client structure for Authelia — secrets come from OIDC_CLIENT_SECRET in homelab.yaml.
 # Redirect URIs are built as https://<subdomain>.<domain><path> unless extra_redirect_uris is set.
 
 authelia_oidc_clients:

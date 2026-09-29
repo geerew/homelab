@@ -7,7 +7,7 @@
     - ../vars/uptime_kuma_status_page.yml
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
@@ -31,7 +31,7 @@
       ansible.builtin.debug:
         msg: >-
           {% if ansible_check_mode %}
-          Check mode: run without --check to apply Autokuma from {{ env_file }}.
+          Check mode: run without --check to apply Autokuma from {{ homelab_config_file }}.
           {% elif uptime_kuma_status_page_sync is defined and uptime_kuma_status_page_sync.changed %}
           Autokuma running; status page /status/{{ uptime_kuma_status_page_slug }} updated
           (Homepage widget reads this slug).

@@ -1,11 +1,8 @@
-# Local env with secrets – never commit
-.env
-.env.local
-!.env.example
+# Local config with secrets — never commit
+homelab.yaml
 
-# Authelia users (plain passwords) — generated users.yml lives under services/
-authelia-users.yml
-authelia-jwks.pem
+# Rendered compose (secrets baked in) — source is compose.tpl.yaml
+compose.yaml
 
 # Old compose files (moved here; contain secrets)
 archive/
@@ -16,5 +13,5 @@ services/
 # Pre-deploy snapshots from Ansible (backups/<service>/<timestamp>/)
 backups/
 
-# Ansible – no secrets here; credentials live in .env only
+# Ansible
 ansible/*.retry

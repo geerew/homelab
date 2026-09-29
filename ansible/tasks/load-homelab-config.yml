@@ -1,0 +1,48 @@
+---
+- name: Resolve homelab directory
+  ansible.builtin.set_fact:
+    homelab_dir: "{{ lookup('env', 'HOMELAB_DIR') | default(playbook_dir + '/../..', true) }}"
+    homelab_config_file: "{{ lookup('env', 'HOMELAB_DIR') | default(playbook_dir + '/../..', true) }}/homelab.yaml"
+
+- name: Check homelab.yaml exists
+  ansible.builtin.stat:
+    path: "{{ homelab_config_file }}"
+  register: homelab_config_stat
+
+- name: Fail when homelab.yaml is missing
+  ansible.builtin.fail:
+    msg: >-
+      Create {{ homelab_config_file }} from homelab.example.yaml before running Ansible.
+  when: not homelab_config_stat.stat.exists
+
+- name: Load homelab.yaml
+  ansible.builtin.include_vars:
+    file: "{{ homelab_config_file }}"
+    name: homelab_config
+
+- name: Flatten homelab.yaml to homelab_env for legacy templates
+  check_mode: false
+  ansible.builtin.shell: |
+    python3 <<'PY'
+    import json
+    import sys
+    from pathlib import Path
+
+    root = Path("{{ homelab_dir }}")
+    sys.path.insert(0, str(root))
+    from homelab_cli.config import flatten_config, load_config
+
+    cfg = load_config(root / "homelab.yaml")
+    print(json.dumps(flatten_config(cfg)))
+    PY
+  register: homelab_env_flat
+  changed_when: false
+
+- name: Set homelab_env fact
+  ansible.builtin.set_fact:
+    homelab_env: "{{ homelab_env_flat.stdout | from_json }}"
+
+- name: Set Authelia users source from homelab config
+  ansible.builtin.set_fact:
+    authelia_users_source:
+      users: "{{ homelab_config.authelia.users }}"

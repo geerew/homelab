@@ -35,16 +35,16 @@
       - SOCKET_PROXY_DISABLE_IPV6
 
   pre_tasks:
-    - ansible.builtin.import_tasks: ../tasks/load-env.yml
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
     - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
 
   tasks:
-    - name: Validate Socket Proxy settings in .env
+    - name: Validate Socket Proxy settings in homelab.yaml
       ansible.builtin.assert:
         that:
           - homelab_env[item] is defined
           - homelab_env[item] | string | length > 0
-        fail_msg: Set {{ item }} in {{ env_file }} (see .env.example).
+        fail_msg: Set {{ item }} in {{ homelab_config_file }} (see homelab.example.yaml).
       loop: "{{ socket_proxy_env_keys }}"
       when: not ansible_check_mode
 
@@ -57,7 +57,7 @@
       ansible.builtin.debug:
         msg: >-
           {% if ansible_check_mode %}
-          Check mode: run without --check to apply Socket Proxy settings from {{ env_file }}.
+          Check mode: run without --check to apply Socket Proxy settings from {{ homelab_config_file }}.
           {% else %}
           Socket Proxy running (log level {{ homelab_env.SOCKET_PROXY_LOG_LEVEL }}).
           Traefik, Homepage, Dozzle, and Autokuma connect via tcp://socket-proxy:2375.
