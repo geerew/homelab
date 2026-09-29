@@ -31,8 +31,6 @@
     - audiobookshelf/config
     - audiobookshelf/metadata
     - mealie/data
-    - wallos/db
-    - wallos/logos
     - memos
     - memos/secrets
     - sparkyfitness/db

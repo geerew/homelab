@@ -69,17 +69,6 @@
         server: local
         container: sparkyfitness-frontend
 
-    - Wallos:
-        icon: sh-wallos
-        href: https://wallos.{{ homelab_env.DOMAIN }}/
-        description: Subscription Tracker
-        server: local
-        container: wallos
-        widget:
-          type: wallos
-          url: https://wallos.{{ homelab_env.DOMAIN }}/
-          key: {{ homelab_env.HOMEPAGE_WALLOS_API_KEY }}
-
 - Arr:
     - Sonarr:
         icon: sh-sonarr

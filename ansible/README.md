@@ -200,7 +200,6 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Jellyfin | `HOMEPAGE_JELLYFIN_API_KEY` |
 | Audiobookshelf | `HOMEPAGE_AUDIOBOOKSHELF_API_KEY` |
 | Mealie | `HOMEPAGE_MEALIE_API_KEY` |
-| Wallos | `HOMEPAGE_WALLOS_API_KEY` |
 | Sonarr, Radarr, Prowlarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
 | Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
@@ -253,7 +252,7 @@ docker run --rm -v "$PWD:/out" authelia/authelia:latest \
 
 Only regenerate when deliberately rotating OIDC signing keys.
 
-**OIDC clients** — structure (redirect URIs, scopes, etc.) lives in [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml). Active clients: Audiobookshelf, Jellyfin, Mealie, Memos, Sparky Fitness, Wallos.
+**OIDC clients** — structure (redirect URIs, scopes, etc.) lives in [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml). Active clients: Audiobookshelf, Jellyfin, Mealie, Memos, Sparky Fitness.
 
 **Access control** — `vpn-status.${DOMAIN}` bypass auto-detects `traefik_network` and `socket_proxy` subnets via [`tasks/resolve-docker-network-subnets.yml`](tasks/resolve-docker-network-subnets.yml).
 
@@ -326,7 +325,7 @@ Compose and Ansible now expect data under `services/`. **Do not restart the stac
    cd "${DATA_DIR:-.}"   # repo root if DATA_DIR=./
    mkdir -p services
    for d in traefik authelia uptime-kuma autokuma homepage jellyfin jellyscope \
-     audiobookshelf mealie wallos memos sparkyfitness seerr gluetun \
+     audiobookshelf mealie memos sparkyfitness seerr gluetun \
      qbittorrent sonarr radarr prowlarr bazarr dispatcharr mccleanengineering trilium; do
      [ -d "$d" ] && mv "$d" services/
    done

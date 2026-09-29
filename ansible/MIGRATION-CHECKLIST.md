@@ -337,7 +337,6 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | --- | --- | --- | --- |
 | **Audiobookshelf** | ⬜ | `services/audiobookshelf/config/` | `deploy-audiobookshelf.yml` — libraries from `AUDIOBOOKS_DIR`, OIDC |
 | **Mealie** | ⬜ | `services/mealie/data/` | `deploy-mealie.yml` — OIDC, OpenAI key from `.env`, default group |
-| **Wallos** | ⬜ | `services/wallos/db/` | `deploy-wallos.yml` — OIDC, currency/settings |
 
 ### Other apps
 
@@ -361,7 +360,7 @@ Work top-to-bottom; each step should leave the stack usable.
 5. **Sonarr → Radarr → Prowlarr → Bazarr** — *arr chain; share patterns (API + `config.xml` snippets)
 6. **Seerr** — depends on Jellyfin + *arr
 7. **Jellyfin** — libraries, OIDC, encoding (biggest remaining gap)
-8. **Audiobookshelf / Mealie / Wallos** — OIDC clients overlap with Authelia work
+8. **Audiobookshelf / Mealie** — OIDC clients overlap with Authelia work
 9. ~~**Uptime Kuma + Autokuma**~~ — done (AutoKuma monitors from labels; Ansible syncs `/status/default` groups)
 10. ~~**Memos**~~ — done (Authelia OIDC via `/etc/secrets`)
 11. **Sparky Fitness / Jellyscope / McClean** — as needed

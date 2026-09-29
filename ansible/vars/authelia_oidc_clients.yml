@@ -99,18 +99,3 @@ authelia_oidc_clients:
       - authorization_code
     userinfo_signed_response_alg: none
     token_endpoint_auth_method: client_secret_post
-
-  wallos:
-    client_name: Wallos
-    subdomain: wallos
-    redirect_paths:
-      - /index.php
-    scopes:
-      - openid
-      - email
-      - profile
-    access_token_signed_response_alg: none
-    userinfo_signed_response_alg: none
-    token_endpoint_auth_method: client_secret_post
-    require_pkce: false
-    pkce_challenge_method: ""

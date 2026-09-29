@@ -452,33 +452,6 @@ services:
       - kuma.mealie.http.url=http://mealie:9000
       - kuma.mealie.http.interval=60
 
-  wallos:
-    image: bellamy/wallos:latest
-    container_name: wallos
-    restart: unless-stopped
-    networks:
-      - traefik_network
-    environment:
-      - TZ=${TZ}
-      - PUID=${PUID}
-      - PGID=${PGID}
-    volumes:
-      - ${DATA_DIR}/services/wallos/db:/var/www/html/db
-      - ${DATA_DIR}/services/wallos/logos:/var/www/html/images/uploads/logos
-    labels:
-      # Watchtower
-      - com.centurylinklabs.watchtower.enable=true
-      # Traefik
-      - traefik.enable=true
-      - traefik.http.routers.wallos.rule=Host(`wallos.${DOMAIN}`)
-      - traefik.http.routers.wallos.entrypoints=websecure
-      - traefik.http.routers.wallos.tls=true
-      - traefik.http.routers.wallos.tls.certresolver=cloudflare
-      # Kuma
-      - kuma.wallos.http.name=Wallos
-      - kuma.wallos.http.url=http://wallos:80
-      - kuma.wallos.http.interval=60
-
   memos:
     image: neosmemo/memos:stable
     container_name: memos

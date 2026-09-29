@@ -34,8 +34,6 @@
           - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY | length > 0
           - homelab_env.HOMEPAGE_MEALIE_API_KEY is defined
           - homelab_env.HOMEPAGE_MEALIE_API_KEY | length > 0
-          - homelab_env.HOMEPAGE_WALLOS_API_KEY is defined
-          - homelab_env.HOMEPAGE_WALLOS_API_KEY | length > 0
           - homelab_env.HOMEPAGE_SONARR_API_KEY is defined
           - homelab_env.HOMEPAGE_SONARR_API_KEY | length > 0
           - homelab_env.HOMEPAGE_RADARR_API_KEY is defined

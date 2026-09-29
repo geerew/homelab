@@ -13,7 +13,6 @@ uptime_kuma_status_page_groups:
       - Jellyscope
       - Audiobookshelf
       - Mealie
-      - Wallos
       - Memos
       - McClean Engineering
       - SparkyFitness
