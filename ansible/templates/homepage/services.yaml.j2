@@ -30,7 +30,7 @@
         widget:
           type: audiobookshelf
           url: https://books.{{ homelab_env.DOMAIN }}/
-          key: {{ homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY }}
+          key: {{ audiobookshelf_api_key }}
           fields: ["books"]
 
     - qBittorrent:

@@ -132,7 +132,7 @@ jellyscope:
   admin_password: ''
   secret_key: ''
 homepage:
-  audiobookshelf_api_key: ''
+  # audiobookshelf_api_key: optional legacy — auto-created as services/audiobookshelf/homepage_api_key
   mealie_api_key: ''
   sonarr_api_key: ''
   radarr_api_key: ''

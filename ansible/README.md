@@ -205,7 +205,7 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Service | `.env` variable |
 | --- | --- |
 | Jellyfin | Auto — API key named `homepage` in `jellyfin.db` (see `deploy-homepage.yml`) |
-| Audiobookshelf | `HOMEPAGE_AUDIOBOOKSHELF_API_KEY` |
+| Audiobookshelf | Auto — API key named `homepage` in `services/audiobookshelf/homepage_api_key` (see `deploy-homepage.yml`) |
 | Mealie | `HOMEPAGE_MEALIE_API_KEY` |
 | Sonarr, Radarr, Prowlarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |

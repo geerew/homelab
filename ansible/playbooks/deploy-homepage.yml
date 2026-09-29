@@ -27,8 +27,10 @@
           - homelab_env.DISPATCHARR_ADMIN_USERNAME | length > 0
           - homelab_env.DISPATCHARR_ADMIN_PASSWORD is defined
           - homelab_env.DISPATCHARR_ADMIN_PASSWORD | length > 0
-          - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY is defined
-          - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY | length > 0
+          - homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME is defined
+          - homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME | length > 0
+          - homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD is defined
+          - homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD | length > 0
           - homelab_env.HOMEPAGE_MEALIE_API_KEY is defined
           - homelab_env.HOMEPAGE_MEALIE_API_KEY | length > 0
           - homelab_env.HOMEPAGE_SONARR_API_KEY is defined
@@ -50,6 +52,9 @@
     - name: Ensure Jellyfin API key for Homepage widget
       ansible.builtin.import_tasks: ../tasks/ensure-jellyfin-api-key.yml
 
+    - name: Ensure Audiobookshelf API key for Homepage widget
+      ansible.builtin.import_tasks: ../tasks/ensure-audiobookshelf-api-key.yml
+
     - name: Verify homepage key is listed in Jellyfin
       ansible.builtin.uri:
         url: http://127.0.0.1:8096/Auth/Keys
@@ -70,9 +75,24 @@
       ansible.builtin.file:
         path: "{{ data_dir }}/services/homepage/config"
         state: directory
-        owner: "{{ homelab_env.PUID | default('1000') }}"
-        group: "{{ homelab_env.PGID | default('1000') }}"
         mode: "0755"
+
+    - name: Fix root-owned Homepage config (deploy only)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - -v
+          - "{{ data_dir }}/services/homepage/config:/data"
+          - alpine
+          - sh
+          - -c
+          - >-
+            mkdir -p /data &&
+            chown -R {{ homelab_env.PUID | default('1000') }}:{{ homelab_env.PGID | default('1000') }} /data
+      changed_when: false
+      when: not ansible_check_mode
 
     - name: Deploy static Homepage config files
       ansible.builtin.copy:

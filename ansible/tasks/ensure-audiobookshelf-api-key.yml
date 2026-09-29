@@ -1,0 +1,81 @@
+---
+- name: Ensure Audiobookshelf data directory exists for API key storage
+  ansible.builtin.file:
+    path: "{{ data_dir }}/services/audiobookshelf"
+    state: directory
+    mode: "0755"
+
+- name: Check for existing Homepage Audiobookshelf API key file
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/audiobookshelf/homepage_api_key"
+  register: abs_homepage_api_key_file
+
+- name: Migrate legacy Audiobookshelf API key from homelab.yaml
+  ansible.builtin.copy:
+    dest: "{{ data_dir }}/services/audiobookshelf/homepage_api_key"
+    content: "{{ homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY | trim }}\n"
+    mode: "0600"
+  register: abs_homepage_api_key_migrated
+  when:
+    - not ansible_check_mode
+    - not abs_homepage_api_key_file.stat.exists or (abs_homepage_api_key_file.stat.size | default(0)) == 0
+    - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY is defined
+    - homelab_env.HOMEPAGE_AUDIOBOOKSHELF_API_KEY | length > 0
+  no_log: true
+
+- name: Fix root-owned Audiobookshelf API key file (deploy only)
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - "{{ data_dir }}/services/audiobookshelf:/data"
+      - alpine
+      - sh
+      - -c
+      - >-
+        mkdir -p /data &&
+        chown {{ homelab_env.PUID | default('1000') }}:{{ homelab_env.PGID | default('1000') }}
+        /data/homepage_api_key 2>/dev/null || true
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - abs_homepage_api_key_file.stat.exists | default(false)
+
+- name: Ensure Audiobookshelf API key for Homepage
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - -v
+      - "{{ playbook_dir }}/../scripts/ensure_audiobookshelf_api_key.py:/ensure_audiobookshelf_api_key.py:ro"
+      - -v
+      - "{{ data_dir }}/services/audiobookshelf:/data"
+      - -e
+      - ABS_URL=http://audiobookshelf:{{ homelab_env.AUDIOBOOKSHELF_PORT | default('13378') }}
+      - -e
+      - AUDIOBOOKSHELF_ROOT_USERNAME={{ homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME }}
+      - -e
+      - AUDIOBOOKSHELF_ROOT_PASSWORD={{ homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD }}
+      - -e
+      - API_KEY_NAME={{ audiobookshelf_api_key_app_name | default('homepage') }}
+      - -e
+      - API_KEY_FILE=/data/homepage_api_key
+      - python:3-alpine
+      - python
+      - /ensure_audiobookshelf_api_key.py
+  register: audiobookshelf_api_key_result
+  changed_when: >-
+    'created Audiobookshelf API key' in audiobookshelf_api_key_result.stderr
+    or (abs_homepage_api_key_migrated.changed | default(false))
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Set ensured Audiobookshelf API key fact
+  ansible.builtin.set_fact:
+    audiobookshelf_api_key: "{{ audiobookshelf_api_key_result.stdout | trim }}"
+  when: not ansible_check_mode
