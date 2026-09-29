@@ -1,0 +1,87 @@
+---
+- name: Ensure Gluetun config directory exists
+  ansible.builtin.file:
+    path: "{{ data_dir }}/services/gluetun"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+
+- name: Check for existing Gluetun control API key
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/gluetun/control_api_key"
+  register: gluetun_api_key_file
+
+- name: Migrate legacy Gluetun API key from .env
+  ansible.builtin.copy:
+    dest: "{{ data_dir }}/services/gluetun/control_api_key"
+    content: "{{ homelab_env.GLUETUN_API_KEY | trim }}\n"
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0600"
+  register: gluetun_api_key_migrated
+  when:
+    - not ansible_check_mode
+    - not gluetun_api_key_file.stat.exists or (gluetun_api_key_file.stat.size | default(0)) == 0
+    - homelab_env.GLUETUN_API_KEY is defined
+    - homelab_env.GLUETUN_API_KEY | length > 0
+  no_log: true
+
+- name: Recheck Gluetun control API key file
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/gluetun/control_api_key"
+  register: gluetun_api_key_file
+  when: not ansible_check_mode
+
+- name: Generate Gluetun control API key
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - >-
+        import secrets, pathlib;
+        pathlib.Path("{{ data_dir }}/services/gluetun/control_api_key").write_text(secrets.token_hex(32) + "\n")
+  register: gluetun_api_key_generated
+  when:
+    - not ansible_check_mode
+    - not gluetun_api_key_file.stat.exists or (gluetun_api_key_file.stat.size | default(0)) == 0
+  changed_when: true
+
+- name: Set Gluetun control API key file permissions
+  ansible.builtin.file:
+    path: "{{ data_dir }}/services/gluetun/control_api_key"
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0600"
+  when: not ansible_check_mode
+
+- name: Load Gluetun control API key
+  ansible.builtin.slurp:
+    src: "{{ data_dir }}/services/gluetun/control_api_key"
+  register: gluetun_api_key_slurp
+  when: not ansible_check_mode
+
+- name: Set Gluetun API key fact
+  ansible.builtin.set_fact:
+    gluetun_api_key: "{{ gluetun_api_key_slurp.content | b64decode | trim }}"
+  when: not ansible_check_mode
+
+- name: Write Gluetun compose env file
+  ansible.builtin.copy:
+    dest: "{{ data_dir }}/services/gluetun/compose.env"
+    content: |
+      GLUETUN_API_KEY={{ gluetun_api_key }}
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0600"
+  register: gluetun_compose_env
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Set Gluetun auth config changed flag
+  ansible.builtin.set_fact:
+    gluetun_auth_config_changed: >-
+      {{ (gluetun_compose_env.changed | default(false))
+      or (gluetun_api_key_migrated.changed | default(false))
+      or (gluetun_api_key_generated.changed | default(false)) }}
+  when: not ansible_check_mode

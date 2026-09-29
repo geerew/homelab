@@ -205,9 +205,10 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
 | Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
 | Dispatcharr | `DISPATCHARR_ADMIN_*` |
-| Gluetun | `GLUETUN_API_KEY`, `VPN_SERVICE_PROVIDER`, `VPN_TYPE`, `WIREGUARD_*`, `SERVER_CITIES`, `GLUETUN_DNS_ADDRESS`, `FIREWALL_OUTBOUND_SUBNETS` |
+| Gluetun | Auto — control API key in `services/gluetun/control_api_key` (see `deploy-gluetun.yml`) |
+| Gluetun VPN | `VPN_SERVICE_PROVIDER`, `VPN_TYPE`, `WIREGUARD_*`, `SERVER_CITIES`, `GLUETUN_DNS_ADDRESS`, `FIREWALL_OUTBOUND_SUBNETS` |
 
-Gluetun VPN settings are read from `.env` by Compose. Ansible renders `config.toml` to `services/gluetun/config.toml` (gitignored) for HTTP control-server auth roles (Homepage widget, local app routes).
+Gluetun VPN settings are read from `.env` by Compose. Ansible auto-generates the HTTP control-server API key, writes `services/gluetun/compose.env` for Compose, and renders `config.toml` (gitignored) for Homepage widget auth.
 
 ### Authelia
 
@@ -284,7 +285,7 @@ ansible-playbook playbooks/deploy-memos.yml
 
 ### Jellyscope
 
-Jellyscope has no OIDC — Authelia protects the edge only. Ansible backs up `services/jellyscope/data/`, reads or creates a dedicated Jellyfin API key named `jellyscope` in `jellyfin.db`, and creates/updates the instance admin from `.env`.
+Jellyscope has no OIDC — Authelia protects the edge only. Ansible backs up `services/jellyscope/data/` to `backups/jellyscope/<timestamp>/` before changes, reads or creates a dedicated Jellyfin API key named `jellyscope` in `jellyfin.db`, and creates/updates the instance admin from `.env`.
 
 | Setting | `.env` variable |
 | --- | --- |

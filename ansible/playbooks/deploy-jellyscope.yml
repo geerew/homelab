@@ -22,23 +22,10 @@
           in {{ env_file }} (see .env.example).
       when: not ansible_check_mode
 
-    - name: Check for existing Jellyscope data directory
-      ansible.builtin.stat:
-        path: "{{ data_dir }}/services/jellyscope/data"
-      register: jellyscope_data_stat
-
-    - name: Back up Jellyscope data before changes
-      ansible.builtin.copy:
-        src: "{{ data_dir }}/services/jellyscope/data/"
-        dest: "{{ data_dir }}/services/jellyscope.backup-{{ ansible_facts.date_time.iso8601_basic_short }}/data/"
-        remote_src: true
-        owner: "{{ homelab_env.PUID | default('1000') }}"
-        group: "{{ homelab_env.PGID | default('1000') }}"
-        mode: preserve
-      when:
-        - not ansible_check_mode
-        - jellyscope_data_stat.stat.exists
-        - jellyscope_data_stat.stat.isdir
+    - ansible.builtin.import_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: jellyscope
+        backup_service_src: "{{ data_dir }}/services/jellyscope/data"
 
     - name: Ensure Jellyscope data directory exists
       ansible.builtin.file:

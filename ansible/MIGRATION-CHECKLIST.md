@@ -203,8 +203,8 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Playbook** | `playbooks/deploy-gluetun.yml` |
 | **In `deploy-services.yml`** | Yes |
 | **Ansible sources** | `templates/gluetun/config.toml.j2` → `services/gluetun/config.toml` |
-| **`.env` keys** | VPN: `GLUETUN_API_KEY`, `VPN_*`, `WIREGUARD_*`, `SERVER_CITIES`, `GLUETUN_DOT`, `GLUETUN_DNS_ADDRESS`, `FIREWALL_OUTBOUND_SUBNETS`. Ports: `GLUETUN_PORT_*`, `SONARR_PORT`, `RADARR_PORT`, `PROWLARR_PORT`, `BAZARR_PORT`, `QBITTORRENT_WEBUI_PORT` |
-| **Configured by Ansible** | HTTP control-server API key roles (Homepage widget, local app routes) |
+| **`.env` keys** | VPN: `VPN_*`, `WIREGUARD_*`, `SERVER_CITIES`, `GLUETUN_DOT`, `GLUETUN_DNS_ADDRESS`, `FIREWALL_OUTBOUND_SUBNETS`. Ports: `GLUETUN_PORT_*`, `SONARR_PORT`, `RADARR_PORT`, `PROWLARR_PORT`, `BAZARR_PORT`, `QBITTORRENT_WEBUI_PORT` |
+| **Configured by Ansible** | HTTP control-server API key auto-generated to `services/gluetun/control_api_key` + `compose.env`; auth roles in `config.toml` (Homepage widget) |
 | **Configured via `.env` + Compose** | VPN provider, WireGuard creds, server cities, DNS, firewall outbound subnets |
 | **Still in Compose only** | Traefik/Kuma labels, HTTP proxy/control-server toggles (port *values* come from `.env`) |
 | **Fresh stand-up** | Fill Gluetun section in `.env`, run `deploy-gluetun.yml`, then `docker compose up -d gluetun` (or `site.yml`) |
@@ -246,7 +246,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Playbook** | `playbooks/deploy-homepage.yml` |
 | **In `deploy-services.yml`** | Yes (last) |
 | **Ansible sources** | `templates/homepage/services.yaml.j2`, `files/homepage/{bookmarks,settings,widgets,docker,proxmox,kubernetes}.yaml` |
-| **`.env` keys** | `DOMAIN`, `DISPATCHARR_ADMIN_*`, `GLUETUN_API_KEY`, `HOMEPAGE_*_API_KEY` (except Jellyfin — auto from `jellyfin.db`) |
+| **`.env` keys** | `DOMAIN`, `DISPATCHARR_ADMIN_*`, `HOMEPAGE_*_API_KEY` (except Jellyfin + Gluetun — auto) |
 | **Configured by Ansible** | Service list with widget URLs/keys; Jellyfin widget key named `homepage` read/created in `jellyfin.db`; bookmarks, settings, widgets, docker/proxmox/kubernetes stubs |
 | **Still in Compose only** | `HOMEPAGE_ALLOWED_HOSTS`, Kuma labels, image version |
 | **Fresh stand-up** | Create per-app API keys in each service UI (except Jellyfin), set remaining `HOMEPAGE_*` in `.env`, run `deploy-homepage.yml` after Jellyfin has started once |
@@ -307,7 +307,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **In `deploy-services.yml`** | Yes (after Jellyfin) |
 | **Ansible sources** | `scripts/ensure_jellyfin_api_key.py`, `scripts/bootstrap_jellyscope.py` |
 | **`.env` keys** | `JELLYSCOPE_SECRET_KEY`, `JELLYSCOPE_ADMIN_USERNAME`, `JELLYSCOPE_ADMIN_PASSWORD` |
-| **Configured by Ansible** | Backs up `services/jellyscope/data/` before changes; reads or creates Jellyfin API key named `jellyscope` in `jellyfin.db`; bootstraps admin + Jellyfin URL/key in SQLite |
+| **Configured by Ansible** | Backs up `services/jellyscope/data/` to `backups/jellyscope/<timestamp>/` before changes; reads or creates Jellyfin API key named `jellyscope` in `jellyfin.db`; bootstraps admin + Jellyfin URL/key in SQLite |
 | **Still in Compose only** | Traefik labels, Kuma labels, media mounts, image build |
 | **Still outside Ansible** | Scan cache (`imagecache/`), playback history in SQLite |
 | **Sign-up policy** | No public registration — `/setup` runs only when zero accounts exist; after bootstrap only admins add users in Settings |

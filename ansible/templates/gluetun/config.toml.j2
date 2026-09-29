@@ -9,7 +9,7 @@
 name = "homepage"
 routes = ["GET /v1/publicip/ip"]
 auth = "apikey"
-apikey = "{{ homelab_env.GLUETUN_API_KEY }}"
+apikey = "{{ gluetun_api_key }}"
 
 [[roles]]
 name = "local_apps"

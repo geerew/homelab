@@ -13,5 +13,8 @@ archive/
 # All service data lives under services/ — created by Ansible, not in Git
 services/
 
+# Pre-deploy snapshots from Ansible (backups/<service>/<timestamp>/)
+backups/
+
 # Ansible – no secrets here; credentials live in .env only
 ansible/*.retry

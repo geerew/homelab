@@ -1,0 +1,42 @@
+---
+# Back up a service data directory before deploy changes.
+#
+# Vars:
+#   backup_service_name — e.g. jellyscope (creates backups/<name>/<timestamp>/)
+#   backup_service_src  — absolute path to the live data directory
+#
+# Requires gather_facts: true in the play (uses ansible_facts.date_time.iso8601_basic_short).
+
+- name: Ensure backups root directory exists
+  ansible.builtin.file:
+    path: "{{ data_dir }}/backups"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+
+- name: Ensure service backup directory exists
+  ansible.builtin.file:
+    path: "{{ data_dir }}/backups/{{ backup_service_name }}"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+
+- name: Check for existing {{ backup_service_name }} data to back up
+  ansible.builtin.stat:
+    path: "{{ backup_service_src }}"
+  register: backup_service_src_stat
+
+- name: Back up {{ backup_service_name }} data before changes
+  ansible.builtin.copy:
+    src: "{{ backup_service_src }}/"
+    dest: "{{ data_dir }}/backups/{{ backup_service_name }}/{{ ansible_facts.date_time.iso8601_basic_short }}/"
+    remote_src: true
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: preserve
+  when:
+    - not ansible_check_mode
+    - backup_service_src_stat.stat.exists
+    - backup_service_src_stat.stat.isdir

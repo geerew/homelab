@@ -21,13 +21,6 @@
           expandOneStreamToTwoRows: false
           fields: ["movies", "series"]
 
-    - Jellyscope:
-        icon: mdi-chart-box-outline
-        href: https://tv-stats.{{ homelab_env.DOMAIN }}/
-        description: Jellyfin Stats
-        server: local
-        container: jellyscope
-
     - Audiobookshelf:
         icon: sh-audiobookshelf
         href: https://books.{{ homelab_env.DOMAIN }}/
@@ -43,6 +36,7 @@
     - qBittorrent:
         icon: sh-qbittorrent
         href: https://torrents.{{ homelab_env.DOMAIN }}/
+        description: Torrent Client
         server: local
         container: qbittorrent
         widget:
@@ -70,7 +64,7 @@
         container: memos
 
     - SparkyFitness:
-        icon: mdi-weight-lifter
+        icon: sh-sparkyfitness
         href: https://fitness.{{ homelab_env.DOMAIN }}/
         description: Fitness & Nutrition Tracker
         server: local
@@ -80,6 +74,7 @@
     - Sonarr:
         icon: sh-sonarr
         href: https://sonarr.{{ homelab_env.DOMAIN }}/
+        description: TV Series Manager
         server: local
         container: sonarr
         widget:
@@ -90,6 +85,7 @@
     - Radarr:
         icon: sh-radarr
         href: https://radarr.{{ homelab_env.DOMAIN }}/
+        description: Movie Manager
         server: local
         container: radarr
         widget:
@@ -100,6 +96,7 @@
     - Prowlarr:
         icon: sh-prowlarr
         href: https://prowlarr.{{ homelab_env.DOMAIN }}/
+        description: Indexer Manager
         server: local
         container: prowlarr
         widget:
@@ -110,6 +107,7 @@
     - Seerr:
         icon: sh-seerr
         href: https://seerr.{{ homelab_env.DOMAIN }}/
+        description: Media Requests
         server: local
         container: seerr
         widget:
@@ -120,6 +118,7 @@
     - Bazarr:
         icon: sh-bazarr
         href: https://bazarr.{{ homelab_env.DOMAIN }}/
+        description: Subtitle Manager
         server: local
         container: bazarr
         widget:
@@ -144,6 +143,7 @@
     - Traefik:
         icon: sh-traefik
         href: https://traefik.{{ homelab_env.DOMAIN }}/
+        description: Reverse Proxy
         server: local
         container: traefik
         widget:
@@ -154,12 +154,13 @@
     - Gluetun:
         icon: sh-gluetun
         href: https://vpn-status.{{ homelab_env.DOMAIN }}/
+        description: VPN Gateway
         server: local
         container: gluetun
         widget:
           type: gluetun
           url: http://gluetun:8000
-          key: {{ homelab_env.GLUETUN_API_KEY }}
+          key: {{ gluetun_api_key }}
           version: 2
 
     - Uptime Kuma:
@@ -173,18 +174,28 @@
           url: http://uptime-kuma:3001
           slug: default
 
+    - Jellyscope:
+        icon: sh-jellystat
+        href: https://tv-stats.{{ homelab_env.DOMAIN }}/
+        description: Jellyfin Stats
+        server: local
+        container: jellyscope
+
     - Dozzle:
         icon: sh-dozzle
         href: https://logs.{{ homelab_env.DOMAIN }}/
+        description: Container Logs
         server: local
         container: dozzle
 
     - DDNS:
         icon: sh-cloudflare
+        description: Dynamic DNS
         server: local
         container: cloudflare-ddns
 
     - Watchtower:
         icon: sh-watchtower
+        description: Container Updates
         server: local
         container: watchtower
