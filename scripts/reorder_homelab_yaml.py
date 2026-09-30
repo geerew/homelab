@@ -14,7 +14,7 @@ SECTIONS: list[tuple[str, list[str]]] = [
     ("# --- Authentication ---", ["authelia"]),
     ("# --- Monitoring & dashboard ---", ["uptime_kuma", "homepage"]),
     ("# --- Shared media paths ---", ["media"]),
-    ("# --- VPN & *arr stack ---", ["gluetun", "qbittorrent", "prowlarr"]),
+    ("# --- VPN & *arr stack ---", ["gluetun", "qbittorrent", "prowlarr", "radarr"]),
     ("# --- IPTV ---", ["dispatcharr"]),
     ("# --- Apps ---", ["audiobookshelf", "mealie", "jellyscope", "memos"]),
     ("# --- Other ---", ["mcclean", "sparkyfitness"]),

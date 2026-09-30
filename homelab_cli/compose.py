@@ -13,8 +13,8 @@ BLOCK_PATTERN = re.compile(r"^\s*\{\{BLOCK:([a-z_]+)\}\}\s*$")
 SCALAR_PATTERN = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*\}\}")
 
 
-def _audiobookshelf_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
-    volumes = cfg.get("audiobookshelf", {}).get("volumes", [])
+def _render_service_volumes(cfg: dict[str, Any], service: str) -> str:
+    volumes = cfg.get(service, {}).get("volumes", [])
     lines = []
     for vol in volumes:
         host = vol.get("host", "")
@@ -22,6 +22,14 @@ def _audiobookshelf_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
         if host and container:
             lines.append(f"      - {host}:{container}")
     return "\n".join(lines)
+
+
+def _audiobookshelf_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
+    return _render_service_volumes(cfg, "audiobookshelf")
+
+
+def _radarr_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
+    return _render_service_volumes(cfg, "radarr")
 
 
 def _gluetun_api_key(_cfg: dict[str, Any], flat: dict[str, str]) -> str:
@@ -38,6 +46,7 @@ def _gluetun_api_key(_cfg: dict[str, Any], flat: dict[str, str]) -> str:
 
 BLOCK_RENDERERS: dict[str, Callable[[dict[str, Any], dict[str, str]], str]] = {
     "audiobookshelf_volumes": _audiobookshelf_volumes,
+    "radarr_volumes": _radarr_volumes,
     "gluetun_api_key": _gluetun_api_key,
 }
 

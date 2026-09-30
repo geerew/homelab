@@ -342,7 +342,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | Service | Compose only today | Config location | Suggested `deploy-*` scope |
 | --- | --- | --- | --- |
 | **Sonarr** | ⬜ | `services/sonarr/config/config.xml` + DB | `deploy-sonarr.yml` — root folders, qBittorrent download client, Prowlarr indexer sync, API key → `.env` for Homepage/Kuma |
-| **Radarr** | ⬜ | `services/radarr/config/config.xml` + DB | `deploy-radarr.yml` — same pattern as Sonarr |
+| **Radarr** | ✅ | `homelab.yaml` + `services/radarr/config/` | `deploy-radarr.yml` — volumes, root folders, Prowlarr Torznab indexers, qBittorrent, naming/media/quality profiles |
 | **Prowlarr** | ✅ | `homelab.yaml` + `services/prowlarr/config/` | `deploy-prowlarr.yml` — external auth (hardcoded) + Cardigann indexers from yaml; Sonarr/Radarr pull via Torznab (no Applications sync) |
 | **Bazarr** | ⬜ | `services/bazarr/config/` | `deploy-bazarr.yml` — language profiles, links to Sonarr/Radarr |
 | **Seerr** | ⬜ | `services/seerr/config/` | `deploy-seerr.yml` — Jellyfin/Plex link, Sonarr/Radarr, OIDC |

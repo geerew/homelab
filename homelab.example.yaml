@@ -96,14 +96,14 @@ media:
 # --- VPN & *arr stack ---
 gluetun:
   api_key: ''
-  vpn_service_provider: mullvad
+  vpn_service_provider: custom  # see Gluetun docs for supported providers
   vpn_type: wireguard
   wireguard_private_key: ''
   wireguard_addresses: ''
   server_cities: ''
-  dot: off
-  dns_address: 10.64.0.1
-  firewall_outbound_subnets: 192.168.90.0/24
+  dot: false
+  dns_address: 1.1.1.1
+  firewall_outbound_subnets: 192.168.0.0/24
   ports:
     httpproxy: 8888
     control_server: 8080
@@ -117,21 +117,63 @@ qbittorrent:
   webui_password: ''
   lan_auth_bypass: true
 prowlarr:
-  # Auth is always external (Authelia at Traefik) — enforced by deploy, not configurable here
   indexers:
-    -
-      name: The Pirate Bay
-      definition: thepiratebay
+    - name: Public Indexer
+      definition: public_tracker
       enable: true
       private: false
-    -
-      name: TorrentLeech
-      definition: torrentleech
+    - name: Private Indexer
+      definition: private_tracker
       enable: true
       private: true
       username: ''
       password: ''
-      # alt2fa_token: ''  # optional TorrentLeech Alt 2FA token
+radarr:
+  volumes:
+    - host: /mnt/media1
+      container: /media
+    - host: /mnt/media2
+      container: /media2
+    - host: /downloads
+      container: /downloads
+  root_folders:
+    - /media/Movies
+  indexers:
+    - Public Indexer
+    - Private Indexer
+  naming:
+    rename_movies: true
+    standard_movie_format: "{Movie Title} ({Release Year})"
+  library_import:
+    enabled: true
+  # File size limits (MB/min). Radarr uses runtime to estimate size:
+  # size ≈ MB/min × runtime. At 100 min: 20 ≈ 2 GB, 26 ≈ 2.5 GB, 82 ≈ 8 GB.
+  quality_definitions:
+    720p:
+      min: 10
+      preferred: 20
+      max: 26
+    1080p:
+      min: 15
+      preferred: 60
+      max: 82
+  quality_profiles:
+    - name: HD-720p
+      cutoff: Bluray-720p
+      upgrade: false
+      qualities:
+        - HDTV-720p
+        - WEBDL-720p
+        - WEBRip-720p
+        - Bluray-720p
+    - name: HD-1080p
+      cutoff: Bluray-1080p
+      upgrade: false
+      qualities:
+        - HDTV-1080p
+        - WEBDL-1080p
+        - WEBRip-1080p
+        - Bluray-1080p
 
 # --- IPTV ---
 dispatcharr:
@@ -152,25 +194,22 @@ dispatcharr:
 # --- Apps ---
 audiobookshelf:
   volumes:
-    -
-      host: /mnt/audiobooks
+    - host: /mnt/audiobooks
       container: /audiobooks
   root_username: admin
   root_password: ''
   libraries:
-    -
-      name: Audiobooks
+    - name: Audiobooks
       media_type: book
-      provider: audible.uk  # Audible.co.uk (also: audible, audible.de, …)
+      provider: audible  # metadata provider id from Audiobookshelf
       settings:
-        coverAspectRatio: 1  # 1 = square covers, 0 = standard
-        disableWatcher: false  # false = automatically watch library for changes
+        coverAspectRatio: 1
+        disableWatcher: false
       folders:
-        - /audiobooks/Books/AudioBooks
+        - /audiobooks/Books
 mealie:
   admin_username: admin
   admin_password: ''
-  # admin_email: optional — defaults to admin@mealie.local
   openai_api_key: ''
 jellyscope:
   admin_username: admin

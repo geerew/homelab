@@ -20,7 +20,8 @@
 #  11. Dispatcharr      — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
 #  12. qBittorrent      — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
 #  13. Prowlarr         — auth + Cardigann indexers from homelab.yaml
-#  14. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
+#  14. Radarr           — volumes, root paths, Prowlarr indexers, qBittorrent, profiles from homelab.yaml
+#  15. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
 #  15. Jellyscope       — admin account + Jellyfin API key from Ansible
 #  16. Homepage         — service list + widgets reference the above (deploy last)
 
@@ -68,6 +69,9 @@
 
 - name: Deploy Prowlarr
   ansible.builtin.import_playbook: deploy-prowlarr.yml
+
+- name: Deploy Radarr
+  ansible.builtin.import_playbook: deploy-radarr.yml
 
 - name: Deploy Jellyfin
   ansible.builtin.import_playbook: deploy-jellyfin.yml

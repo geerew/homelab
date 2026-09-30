@@ -1,0 +1,27 @@
+---
+- name: Bootstrap Radarr settings from homelab.yaml
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ playbook_dir }}/../scripts/bootstrap_radarr.py"
+  environment:
+    RADARR_URL: "http://127.0.0.1:{{ homelab_env.RADARR_PORT | default('7878') }}"
+    RADARR_CONFIG_XML: "{{ data_dir }}/services/radarr/config/config.xml"
+    PROWLARR_URL: "http://127.0.0.1:{{ homelab_env.PROWLARR_PORT | default('9696') }}"
+    PROWLARR_CONFIG_XML: "{{ data_dir }}/services/prowlarr/config/config.xml"
+    PROWLARR_PORT: "{{ homelab_env.PROWLARR_PORT | default('9696') }}"
+    RADARR_ROOT_FOLDERS: "{{ homelab_env.RADARR_ROOT_FOLDERS }}"
+    RADARR_INDEXERS: "{{ homelab_env.RADARR_INDEXERS }}"
+    RADARR_DOWNLOAD_CLIENTS: "{{ homelab_env.RADARR_DOWNLOAD_CLIENTS }}"
+    RADARR_NAMING: "{{ homelab_env.RADARR_NAMING }}"
+    RADARR_MEDIA_MANAGEMENT: "{{ homelab_env.RADARR_MEDIA_MANAGEMENT }}"
+    RADARR_QUALITIES: "{{ homelab_env.RADARR_QUALITIES | default('{}') }}"
+    RADARR_QUALITY_PROFILES: "{{ homelab_env.RADARR_QUALITY_PROFILES }}"
+    RADARR_LIBRARY_IMPORT: "{{ homelab_env.RADARR_LIBRARY_IMPORT | default('{\"enabled\": true}') }}"
+    QBITTORRENT_WEBUI_PORT: "{{ homelab_env.QBITTORRENT_WEBUI_PORT | default('9865') }}"
+    QBITTORRENT_WEBUI_USERNAME: "{{ homelab_env.QBITTORRENT_WEBUI_USERNAME }}"
+    QBITTORRENT_WEBUI_PASSWORD: "{{ homelab_env.QBITTORRENT_WEBUI_PASSWORD }}"
+  register: radarr_bootstrap
+  changed_when: "'nothing to change' not in radarr_bootstrap.stderr"
+  no_log: true
+  when: not ansible_check_mode

@@ -269,6 +269,7 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
     gl_ports = gl.get("ports", {})
     qb = cfg.get("qbittorrent", {})
     prowlarr = cfg.get("prowlarr", {})
+    radarr = cfg.get("radarr", {})
     media = cfg.get("media", {})
     abs_cfg = cfg.get("audiobookshelf", {})
     kuma = cfg.get("uptime_kuma", {})
@@ -295,6 +296,24 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
             }
             for idx in prowlarr_indexers
         ]
+    )
+
+    radarr_indexers_json = json.dumps(radarr.get("indexers", []))
+    radarr_download_clients_json = json.dumps(radarr.get("download_clients", []))
+    radarr_root_folders_json = json.dumps(radarr.get("root_folders", []))
+    radarr_naming_json = json.dumps(radarr.get("naming", {}))
+    radarr_media_management_json = json.dumps(radarr.get("media_management", {}))
+    radarr_qualities_json = json.dumps(radarr.get("qualities", {}))
+    radarr_quality_profiles_json = json.dumps(radarr.get("quality_profiles", []))
+    radarr_quality_definitions_json = json.dumps(radarr.get("quality_definitions", {}))
+    library_import = radarr.get("library_import", {})
+    radarr_library_import_json = json.dumps(
+        {
+            "enabled": library_import.get("enabled", True),
+            "quality_profile": library_import.get("quality_profile", ""),
+            "minimum_availability": library_import.get("minimum_availability", "released"),
+            "monitor": library_import.get("monitor", "none"),
+        }
     )
 
     # bootstrap script expects mediaType in JSON
@@ -397,6 +416,15 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "QBITTORRENT_WEBUI_PASSWORD": str(qb.get("webui_password", "")),
         "QBITTORRENT_LAN_AUTH_BYPASS": str(qb.get("lan_auth_bypass", "true")),
         "PROWLARR_INDEXERS": prowlarr_indexers_json,
+        "RADARR_ROOT_FOLDERS": radarr_root_folders_json,
+        "RADARR_INDEXERS": radarr_indexers_json,
+        "RADARR_DOWNLOAD_CLIENTS": radarr_download_clients_json,
+        "RADARR_NAMING": radarr_naming_json,
+        "RADARR_MEDIA_MANAGEMENT": radarr_media_management_json,
+        "RADARR_QUALITIES": radarr_qualities_json,
+        "RADARR_QUALITY_PROFILES": radarr_quality_profiles_json,
+        "RADARR_QUALITY_DEFINITIONS": radarr_quality_definitions_json,
+        "RADARR_LIBRARY_IMPORT": radarr_library_import_json,
         "MEDIA1_DIR": str(media.get("media1_dir", "")),
         "MEDIA2_DIR": str(media.get("media2_dir", "")),
         "AUDIOBOOKS_DIR": str(media.get("audiobooks_dir", "")),

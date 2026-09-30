@@ -42,6 +42,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
 | `playbooks/deploy-prowlarr.yml` | Prowlarr external auth (hardcoded) + Cardigann indexers from `homelab.yaml`; backs up full service dir |
+| `playbooks/deploy-radarr.yml` | Radarr volumes, root folders, Prowlarr indexers, qBittorrent, profiles from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
 | `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
 | `playbooks/deploy-jellyscope.yml` | Bootstrap Jellyscope admin + ensure Jellyfin API key; sync connection settings |
@@ -93,6 +94,9 @@ ansible-playbook playbooks/deploy-qbittorrent.yml
 # Deploy Prowlarr (auth + indexers from homelab.yaml)
 ansible-playbook playbooks/deploy-prowlarr.yml
 
+# Deploy Radarr (paths, indexers, download client, profiles from homelab.yaml)
+ansible-playbook playbooks/deploy-radarr.yml
+
 # Deploy Homepage config (widget creds/keys from .env)
 ansible-playbook playbooks/deploy-homepage.yml
 
@@ -122,8 +126,9 @@ Run `site.yml` before any deploy playbook — Socket Proxy must be up before Tra
 | 10 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
 | 11 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
 | 12 | `deploy-prowlarr.yml` | Gluetun + Prowlarr on `:9696` |
-| 13 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
-| 14 | `deploy-homepage.yml` | — (last) |
+| 13 | `deploy-radarr.yml` | Gluetun + Prowlarr indexers; qBittorrent creds from yaml |
+| 14 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
+| 15 | `deploy-homepage.yml` | — (last) |
 
 Use `deploy-services.yml` to run steps 1–13 in this order automatically.
 
@@ -375,6 +380,30 @@ Sonarr/Radarr should **not** use Prowlarr Applications sync. Add Torznab indexer
 ```bash
 ansible-playbook playbooks/deploy-prowlarr.yml
 # Run after deploy-gluetun.yml (Prowlarr shares Gluetun's network)
+```
+
+### Radarr
+
+Radarr settings are managed from `homelab.yaml` (`radarr.*`). Auth is always **external** (Authelia at Traefik). The playbook backs up the full `services/radarr/` tree, regenerates compose volume mounts, and bootstraps via API.
+
+| Setting | `homelab.yaml` key |
+| --- | --- |
+| Volume mounts | `radarr.volumes[]` — `host` / `container` (like Audiobookshelf) |
+| Library root paths | `radarr.root_folders[]` — container paths (e.g. `/media/Movies`) |
+| Indexers | `radarr.indexers[]` — Prowlarr name (string) or `{ name?, prowlarr_indexer }`; Torznab URL/id resolved at deploy |
+| Download client | Defaults to qBittorrent (`localhost`, `gluetun.ports.qbittorrent_webui`, creds from `qbittorrent.*`); optional `radarr.download_clients[]` overrides |
+| Naming | `radarr.naming` — optional overrides only (omit = Radarr defaults) |
+| Media management | `radarr.media_management` — optional overrides only |
+| Quality overrides | `radarr.qualities` — optional map of 720/1080-tier quality name → `true`/`false` |
+| Quality profiles | `radarr.quality_profiles[]` — `name`, `cutoff`, `qualities[]` (which source types are allowed) |
+| Quality definitions | `radarr.quality_definitions` — min/preferred/max in **MB/min** per quality or tier (`720p`, `1080p`); rejects releases outside size range |
+| Library import | `radarr.library_import` — mirrors UI library import: scans root folders for unmapped folders, TMDB lookup, bulk import with `monitor: none` and quality profile `Any` by default; set `enabled: false` to skip |
+
+Deploy **prowlarr** before radarr (indexers resolve Prowlarr ids at bootstrap time). qBittorrent credentials come from `qbittorrent.webui_*`.
+
+```bash
+ansible-playbook playbooks/deploy-radarr.yml
+# Run after deploy-prowlarr.yml and deploy-qbittorrent.yml
 ```
 
 ### Jellyfin branding

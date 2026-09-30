@@ -26,6 +26,7 @@ DEPLOY_ORDER: list[str] = [
     "dispatcharr",
     "qbittorrent",
     "prowlarr",
+    "radarr",
     "jellyfin",
     "jellyscope",
     "homepage",

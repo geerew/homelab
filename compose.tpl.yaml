@@ -743,9 +743,7 @@ services:
       - TZ={{ TZ }}
     volumes:
       - {{ DATA_DIR }}/services/radarr/config:/config
-      - {{ MEDIA1_DIR }}:/media
-      - {{ MEDIA2_DIR }}:/media2
-      - {{ DOWNLOADS_DIR }}:/downloads
+{{BLOCK:radarr_volumes}}
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
