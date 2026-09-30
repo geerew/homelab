@@ -212,7 +212,8 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Jellyfin | Auto — API key named `homepage` in `jellyfin.db` (see `deploy-homepage.yml`) |
 | Audiobookshelf | Auto — API key named `homepage` in `services/audiobookshelf/homepage_api_key` (see `deploy-homepage.yml`) |
 | Mealie | Auto — long-lived token named `homepage` in `services/mealie/homepage_api_key` (owned by `mealie.admin_username` service account; run `deploy mealie` first) |
-| Sonarr, Radarr, Prowlarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
+| Prowlarr | Auto — API key from `services/prowlarr/config/config.xml` (run `deploy prowlarr` first) |
+| Sonarr, Radarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
 | Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
 | Dispatcharr | `DISPATCHARR_ADMIN_*` |
@@ -367,9 +368,9 @@ Cardigann indexers are managed from `homelab.yaml` (`prowlarr.indexers`). Auth i
 | --- | --- |
 | Indexers | `prowlarr.indexers[]` — `name`, `definition` (Cardigann id), `enable`, `private` |
 | Private creds | `username`, `password` on indexers where `private: true` (tracker site login, not Prowlarr) |
-| API / Homepage | Prowlarr API key in `config.xml` / `homepage.prowlarr_api_key` |
+| Homepage widget | Auto — API key read from `config.xml` by `deploy-homepage.yml` |
 
-Sonarr/Radarr should **not** use Prowlarr Applications sync. Add Torznab indexers pointing at `http://localhost:9696/{prowlarr_indexer_id}/` with the Prowlarr API key from `config.xml` (also in `homepage.prowlarr_api_key`).
+Sonarr/Radarr should **not** use Prowlarr Applications sync. Add Torznab indexers pointing at `http://localhost:9696/{prowlarr_indexer_id}/` with the Prowlarr API key from `config.xml`.
 
 ```bash
 ansible-playbook playbooks/deploy-prowlarr.yml

@@ -83,7 +83,6 @@ uptime_kuma:
 homepage:
   sonarr_api_key: ''
   radarr_api_key: ''
-  prowlarr_api_key: ''
   seerr_api_key: ''
   bazarr_api_key: ''
 

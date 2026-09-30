@@ -35,8 +35,6 @@
           - homelab_env.HOMEPAGE_SONARR_API_KEY | length > 0
           - homelab_env.HOMEPAGE_RADARR_API_KEY is defined
           - homelab_env.HOMEPAGE_RADARR_API_KEY | length > 0
-          - homelab_env.HOMEPAGE_PROWLARR_API_KEY is defined
-          - homelab_env.HOMEPAGE_PROWLARR_API_KEY | length > 0
           - homelab_env.HOMEPAGE_SEERR_API_KEY is defined
           - homelab_env.HOMEPAGE_SEERR_API_KEY | length > 0
           - homelab_env.HOMEPAGE_BAZARR_API_KEY is defined
@@ -58,6 +56,9 @@
 
     - name: Ensure Mealie API key for Homepage widget
       ansible.builtin.import_tasks: ../tasks/ensure-mealie-api-key.yml
+
+    - name: Ensure Prowlarr API key for Homepage widget
+      ansible.builtin.import_tasks: ../tasks/ensure-prowlarr-api-key.yml
 
     - name: Verify homepage key is listed in Jellyfin
       ansible.builtin.uri:
