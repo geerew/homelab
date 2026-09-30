@@ -21,6 +21,7 @@ DEPLOY_ORDER: list[str] = [
     "autokuma",
     "memos",
     "audiobookshelf",
+    "mealie",
     "gluetun",
     "dispatcharr",
     "qbittorrent",
@@ -94,3 +95,10 @@ def resolve_deploy_playbooks(
 def all_compose_services(registry: dict[str, Any] | None = None) -> list[str]:
     reg = registry or load_registry()
     return list(reg.get("services", {}).keys())
+
+
+def backupable_services(registry: dict[str, Any] | None = None) -> list[str]:
+    """Services with backup: true in config/services.yaml (used by homelab backup --all)."""
+    reg = registry or load_registry()
+    services: dict[str, Any] = reg.get("services", {})
+    return [name for name, svc in services.items() if svc.get("backup")]

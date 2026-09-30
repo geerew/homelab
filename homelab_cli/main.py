@@ -9,8 +9,10 @@ import sys
 from homelab_cli import __version__
 from homelab_cli.compose import render_compose
 from homelab_cli.config import ConfigError, load_config, validate_config
+from homelab_cli import backup as backup_mod
 from homelab_cli import deploy as deploy_mod
 from homelab_cli import docker as docker_mod
+from homelab_cli.registry import backupable_services, load_registry
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -55,6 +57,24 @@ def build_parser() -> argparse.ArgumentParser:
         "--verbose",
         action="store_true",
         help="Full Ansible output (show skipped tasks, default callback)",
+    )
+
+    backup_p = sub.add_parser("backup", help="Back up service data under services/<name>/")
+    backup_p.add_argument("services", nargs="*", metavar="SERVICE")
+    backup_p.add_argument(
+        "--all",
+        action="store_true",
+        help="Back up every service marked backup: true in config/services.yaml",
+    )
+    backup_p.add_argument(
+        "--label",
+        metavar="NAME",
+        help="Prefix backup folder (e.g. manual → manual-20260929T191045Z)",
+    )
+    backup_p.add_argument(
+        "--list",
+        action="store_true",
+        help="List services included in backup --all",
     )
 
     return parser
@@ -115,7 +135,30 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
+        if args.command == "backup":
+            if args.list:
+                names = backupable_services(load_registry())
+                if names:
+                    print("Services in backup --all:")
+                    for name in names:
+                        print(f"  {name}")
+                else:
+                    print("No services marked backup: true in config/services.yaml")
+                return 0
+            if not args.all and not args.services:
+                print("Specify service names, --all, or --list", file=sys.stderr)
+                return 1
+            backup_mod.run_backup(
+                services=args.services or None,
+                backup_all=args.all,
+                label=args.label,
+            )
+            return 0
+
     except ConfigError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except backup_mod.BackupError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     except subprocess.CalledProcessError as exc:

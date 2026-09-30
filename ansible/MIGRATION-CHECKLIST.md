@@ -352,7 +352,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | Service | Compose only today | Config location | Suggested `deploy-*` scope |
 | --- | --- | --- | --- |
 | **Audiobookshelf** | ✅ | `homelab.yaml` + `services/audiobookshelf/config/` | `deploy-audiobookshelf.yml` — backups, volumes/libraries in yaml, OIDC bootstrap |
-| **Mealie** | ⬜ | `services/mealie/data/` | `deploy-mealie.yml` — OIDC, OpenAI key from `.env`, default group |
+| **Mealie** | ✅ | `services/mealie/` (`data/` is the Docker mount) | `deploy-mealie.yml` — full service dir backed up; Authelia OIDC; optional OpenAI key in `homelab.yaml` |
 
 ### Other apps
 

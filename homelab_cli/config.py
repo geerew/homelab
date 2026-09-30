@@ -155,6 +155,9 @@ def env_to_config(env: dict[str, str], users: dict[str, Any] | None = None, jwks
             "jwt_secret": env.get("SPARKY_FITNESS_JWT_SECRET", ""),
         },
         "mealie": {
+            "admin_username": env.get("MEALIE_ADMIN_USERNAME", "admin"),
+            "admin_password": env.get("MEALIE_ADMIN_PASSWORD", ""),
+            "admin_email": env.get("MEALIE_ADMIN_EMAIL", ""),
             "openai_api_key": env.get("MEALIE_OPENAI_API_KEY", ""),
         },
         "gluetun": {
@@ -356,6 +359,9 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "SPARKY_FITNESS_ENCRYPTION_KEY": str(sf.get("encryption_key", "")),
         "SPARKY_FITNESS_BETTER_AUTH": str(sf.get("better_auth", "")),
         "SPARKY_FITNESS_JWT_SECRET": str(sf.get("jwt_secret", "")),
+        "MEALIE_ADMIN_USERNAME": str(mealie.get("admin_username", "admin")),
+        "MEALIE_ADMIN_PASSWORD": str(mealie.get("admin_password", "")),
+        "MEALIE_ADMIN_EMAIL": str(mealie.get("admin_email", "")),
         "MEALIE_OPENAI_API_KEY": str(mealie.get("openai_api_key", "")),
         "GLUETUN_API_KEY": str(gl.get("api_key", "")),
         "VPN_SERVICE_PROVIDER": str(gl.get("vpn_service_provider", "")),

@@ -78,6 +78,9 @@ sparkyfitness:
   better_auth: ''
   jwt_secret: ''
 mealie:
+  admin_username: admin
+  admin_password: ''
+  # admin_email: optional — defaults to admin@mealie.local
   openai_api_key: ''
 gluetun:
   api_key: ''
@@ -133,7 +136,7 @@ jellyscope:
   secret_key: ''
 homepage:
   # audiobookshelf_api_key: optional legacy — auto-created as services/audiobookshelf/homepage_api_key
-  mealie_api_key: ''
+  # mealie_api_key: optional legacy — auto-created as services/mealie/homepage_api_key
   sonarr_api_key: ''
   radarr_api_key: ''
   prowlarr_api_key: ''

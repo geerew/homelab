@@ -24,6 +24,11 @@
           in {{ homelab_config_file }} (see homelab.example.yaml).
       when: not ansible_check_mode
 
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: memos
+      when: not ansible_check_mode
+
     - name: Ensure Memos secrets directory exists
       ansible.builtin.file:
         path: "{{ data_dir }}/services/memos/secrets"

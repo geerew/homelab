@@ -1,0 +1,101 @@
+---
+- name: Deploy Mealie
+  hosts: localhost
+  gather_facts: true
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Mealie variables in homelab.yaml
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DOMAIN is defined
+          - homelab_env.DOMAIN | length > 0
+          - homelab_env.OIDC_CLIENT_SECRET is defined
+          - homelab_env.OIDC_CLIENT_SECRET | length > 0
+          - homelab_env.MEALIE_ADMIN_USERNAME is defined
+          - homelab_env.MEALIE_ADMIN_USERNAME | length > 0
+          - homelab_env.MEALIE_ADMIN_PASSWORD is defined
+          - homelab_env.MEALIE_ADMIN_PASSWORD | length >= 8
+        fail_msg: >-
+          Set authelia.oidc_client_secret and mealie.admin_username / mealie.admin_password
+          (min 8 chars) in {{ homelab_config_file }} (see homelab.example.yaml).
+      when: not ansible_check_mode
+
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: mealie
+      when: not ansible_check_mode
+
+    - name: Ensure Mealie data directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/mealie/data"
+        state: directory
+        mode: "0755"
+
+    - name: Fix root-owned Mealie data (deploy only)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - -v
+          - "{{ data_dir }}/services/mealie/data:/data"
+          - alpine
+          - sh
+          - -c
+          - >-
+            mkdir -p /data &&
+            chown -R {{ homelab_env.PUID | default('1000') }}:{{ homelab_env.PGID | default('1000') }} /data
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: mealie
+
+    - name: Wait for Mealie HTTP health (database init on first start)
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - traefik_network
+          - curlimages/curl:latest
+          - -fsS
+          - http://mealie:9000/api/app/about
+      register: mealie_health_wait
+      until: mealie_health_wait.rc == 0
+      retries: 12
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/bootstrap-mealie.yml
+
+    - name: Restart Mealie after bootstrap
+      community.docker.docker_container:
+        name: mealie
+        state: started
+        restart: true
+      when:
+        - not ansible_check_mode
+        - mealie_bootstrap.changed | default(false)
+
+    - name: Report Mealie deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to deploy Mealie from {{ homelab_config_file }}.
+          {% else %}
+          Mealie at https://food.{{ homelab_env.DOMAIN }}/ — Authelia OIDC for humans
+          (password login hidden; auto-redirect to Authelia).
+          Local service admin '{{ homelab_env.MEALIE_ADMIN_USERNAME }}' for automation/Homepage;
+          break-glass login at /login?direct=1 if needed.
+          OIDC admins: mealie-admins; users: mealie-users.
+          Default group/household for new OIDC users: Home / Family.
+          OpenAI provider configured from homelab.yaml when set.
+          {% endif %}

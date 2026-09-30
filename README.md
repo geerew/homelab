@@ -48,6 +48,10 @@ cd ansible && ansible-galaxy collection install -r requirements.yml
 | `./bin/homelab stop/start/restart [service...]` | Service control |
 | `./bin/homelab deploy [service...]` | Ansible deploy playbooks |
 | `./bin/homelab deploy --all` | Full deploy order |
+| `./bin/homelab backup [service...]` | Copy `services/<name>/` → `backups/<name>/<timestamp>/` |
+| `./bin/homelab backup --all` | Back up services marked `backup: true` in `config/services.yaml` |
+| `./bin/homelab backup mealie --label manual` | Named backup (e.g. `manual-20260929T191045Z`) |
+| `./bin/homelab backup --list` | Show which services `--all` includes |
 | `./bin/homelab deploy SERVICE --check` | Dry-run deploy (no changes applied) |
 | `./bin/homelab deploy SERVICE --check --diff` | Preview compose + Ansible file diffs (compact output) |
 | `./bin/homelab deploy SERVICE --check -v` | Dry-run with full Ansible output including skipped tasks |

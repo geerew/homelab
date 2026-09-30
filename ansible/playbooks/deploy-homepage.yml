@@ -31,8 +31,6 @@
           - homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME | length > 0
           - homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD is defined
           - homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD | length > 0
-          - homelab_env.HOMEPAGE_MEALIE_API_KEY is defined
-          - homelab_env.HOMEPAGE_MEALIE_API_KEY | length > 0
           - homelab_env.HOMEPAGE_SONARR_API_KEY is defined
           - homelab_env.HOMEPAGE_SONARR_API_KEY | length > 0
           - homelab_env.HOMEPAGE_RADARR_API_KEY is defined
@@ -43,9 +41,12 @@
           - homelab_env.HOMEPAGE_SEERR_API_KEY | length > 0
           - homelab_env.HOMEPAGE_BAZARR_API_KEY is defined
           - homelab_env.HOMEPAGE_BAZARR_API_KEY | length > 0
+          - homelab_env.MEALIE_ADMIN_USERNAME is defined
+          - homelab_env.MEALIE_ADMIN_USERNAME | length > 0
         fail_msg: >-
-          Set DOMAIN, DISPATCHARR_ADMIN_*, and HOMEPAGE_* widget secrets in {{ homelab_config_file }}
-          (see homelab.example.yaml). Jellyfin and Gluetun keys are automatic.
+          Set DOMAIN, DISPATCHARR_ADMIN_*, HOMEPAGE_* widget secrets, and mealie.admin_username in
+          {{ homelab_config_file }} (see homelab.example.yaml). Jellyfin, Audiobookshelf, Mealie,
+          and Gluetun keys are automatic after deploy mealie.
 
     - ansible.builtin.import_tasks: ../tasks/ensure-gluetun-api-key.yml
 
@@ -54,6 +55,9 @@
 
     - name: Ensure Audiobookshelf API key for Homepage widget
       ansible.builtin.import_tasks: ../tasks/ensure-audiobookshelf-api-key.yml
+
+    - name: Ensure Mealie API key for Homepage widget
+      ansible.builtin.import_tasks: ../tasks/ensure-mealie-api-key.yml
 
     - name: Verify homepage key is listed in Jellyfin
       ansible.builtin.uri:

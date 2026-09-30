@@ -1,0 +1,104 @@
+---
+- name: Ensure Mealie data directory exists for API key storage
+  ansible.builtin.file:
+    path: "{{ data_dir }}/services/mealie/data"
+    state: directory
+    mode: "0755"
+
+- name: Check for existing Homepage Mealie API key file
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/mealie/homepage_api_key"
+  register: mealie_homepage_api_key_file
+
+- name: Migrate legacy Mealie API key from homelab.yaml
+  ansible.builtin.copy:
+    dest: "{{ data_dir }}/services/mealie/homepage_api_key"
+    content: "{{ homelab_env.HOMEPAGE_MEALIE_API_KEY | trim }}\n"
+    mode: "0600"
+  register: mealie_homepage_api_key_migrated
+  when:
+    - not ansible_check_mode
+    - not mealie_homepage_api_key_file.stat.exists or (mealie_homepage_api_key_file.stat.size | default(0)) == 0
+    - homelab_env.HOMEPAGE_MEALIE_API_KEY is defined
+    - homelab_env.HOMEPAGE_MEALIE_API_KEY | length > 0
+  no_log: true
+
+- name: Fix root-owned Mealie API key file (deploy only)
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - "{{ data_dir }}/services/mealie:/data"
+      - alpine
+      - sh
+      - -c
+      - >-
+        mkdir -p /data &&
+        chown {{ homelab_env.PUID | default('1000') }}:{{ homelab_env.PGID | default('1000') }}
+        /data/homepage_api_key 2>/dev/null || true
+  changed_when: false
+  when:
+    - not ansible_check_mode
+    - mealie_homepage_api_key_file.stat.exists | default(false)
+
+- name: Ensure Mealie API key for Homepage
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - -v
+      - "{{ playbook_dir }}/../scripts/ensure_mealie_api_key.py:/ensure_mealie_api_key.py:ro"
+      - -v
+      - "{{ data_dir }}/services/mealie/data:/data"
+      - -v
+      - "{{ data_dir }}/services/mealie:/mealie"
+      - -e
+      - MEALIE_URL=http://mealie:9000
+      - -e
+      - MEALIE_DATA_DIR=/data
+      - -e
+      - MEALIE_ADMIN_USERNAME={{ homelab_env.MEALIE_ADMIN_USERNAME }}
+      - -e
+      - API_TOKEN_NAME={{ mealie_api_key_app_name | default('homepage') }}
+      - -e
+      - API_KEY_FILE=/mealie/homepage_api_key
+      - python:3-alpine
+      - sh
+      - -c
+      - pip install -q PyJWT && python /ensure_mealie_api_key.py
+  register: mealie_api_key_result
+  changed_when: >-
+    'created Mealie API token' in mealie_api_key_result.stderr
+    or (mealie_homepage_api_key_migrated.changed | default(false))
+  failed_when: mealie_api_key_result.rc != 0
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Set ensured Mealie API key fact
+  ansible.builtin.set_fact:
+    mealie_api_key: "{{ mealie_api_key_result.stdout | trim }}"
+  when: not ansible_check_mode
+
+- name: Load existing Mealie API key from file (check mode)
+  ansible.builtin.slurp:
+    src: "{{ data_dir }}/services/mealie/homepage_api_key"
+  register: mealie_api_key_file_slurp
+  when:
+    - ansible_check_mode
+    - mealie_homepage_api_key_file.stat.exists | default(false)
+    - (mealie_homepage_api_key_file.stat.size | default(0)) > 0
+  no_log: true
+
+- name: Set Mealie API key from existing file (check mode)
+  ansible.builtin.set_fact:
+    mealie_api_key: "{{ mealie_api_key_file_slurp.content | b64decode | trim }}"
+  when:
+    - ansible_check_mode
+    - mealie_api_key_file_slurp.content is defined
+    - mealie_api_key_file_slurp.content | b64decode | trim | length > 0
+  no_log: true

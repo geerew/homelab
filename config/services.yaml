@@ -25,12 +25,16 @@ services:
     deploy_playbook: deploy-jellyfin.yml
   jellyscope:
     deploy_playbook: deploy-jellyscope.yml
+    backup: true
   audiobookshelf:
     deploy_playbook: deploy-audiobookshelf.yml
+    backup: true
   mealie:
-    deploy_playbook: null
+    deploy_playbook: deploy-mealie.yml
+    backup: true
   memos:
     deploy_playbook: deploy-memos.yml
+    backup: true
   sparkyfitness-db:
     deploy_playbook: null
   sparkyfitness-server:

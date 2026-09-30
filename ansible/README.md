@@ -37,7 +37,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-uptime-kuma.yml` | Start Uptime Kuma; wait for health |
 | `playbooks/deploy-autokuma.yml` | Start Autokuma; sync public status page groups via Kuma API |
 | `playbooks/deploy-memos.yml` | Render Memos Authelia OIDC config to `/etc/secrets`; apply Compose |
-| `playbooks/deploy-audiobookshelf.yml` | Media mounts, libraries, Authelia OIDC bootstrap; backs up config + metadata |
+| `playbooks/deploy-audiobookshelf.yml` | Media mounts, libraries, Authelia OIDC bootstrap; backs up full service dir |
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
@@ -206,7 +206,7 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | --- | --- |
 | Jellyfin | Auto — API key named `homepage` in `jellyfin.db` (see `deploy-homepage.yml`) |
 | Audiobookshelf | Auto — API key named `homepage` in `services/audiobookshelf/homepage_api_key` (see `deploy-homepage.yml`) |
-| Mealie | `HOMEPAGE_MEALIE_API_KEY` |
+| Mealie | Auto — long-lived token named `homepage` in `services/mealie/homepage_api_key` (owned by `mealie.admin_username` service account; run `deploy mealie` first) |
 | Sonarr, Radarr, Prowlarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
 | Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
@@ -277,7 +277,7 @@ Memos 0.30+ loads login policy from deployment-managed JSON under `services/memo
 | Private instance | `memos-instance-setting-access.json` |
 | Instance admin | `MEMOS_ADMIN_USERNAME` / `MEMOS_ADMIN_PASSWORD` in `.env` (created on first install) |
 
-Memos requires at least one user before the setup wizard clears. Ansible creates the instance admin from `MEMOS_ADMIN_USERNAME` and `MEMOS_ADMIN_PASSWORD` on first install, then the main login page shows Authelia SSO. Local admin sign-in: `https://notes.${DOMAIN}/auth/admin`. Run after Authelia:
+Memos requires at least one user before the setup wizard clears. Ansible backs up `services/memos/` before changes, creates the instance admin from `MEMOS_ADMIN_USERNAME` and `MEMOS_ADMIN_PASSWORD` on first install, then the main login page shows Authelia SSO. Local admin sign-in: `https://notes.${DOMAIN}/auth/admin`. Run after Authelia:
 
 ```bash
 ansible-playbook playbooks/deploy-memos.yml
@@ -286,7 +286,7 @@ ansible-playbook playbooks/deploy-memos.yml
 
 ### Audiobookshelf
 
-Audiobookshelf uses in-app Authelia OIDC (Traefik does not forward-auth the app). Ansible backs up `services/audiobookshelf/config/` before changes, regenerates `compose.yaml` (volume mounts from `homelab.yaml`), and bootstraps via API.
+Audiobookshelf uses in-app Authelia OIDC (Traefik does not forward-auth the app). Ansible backs up `services/audiobookshelf/` before changes, regenerates `compose.yaml` (volume mounts from `homelab.yaml`), and bootstraps via API.
 
 | Setting | Source in `homelab.yaml` |
 | --- | --- |
@@ -296,6 +296,27 @@ Audiobookshelf uses in-app Authelia OIDC (Traefik does not forward-auth the app)
 | OIDC client secret | `authelia.oidc_client_secret` (client id `audiobookshelf`) |
 
 Run after Authelia: `./bin/homelab deploy audiobookshelf` (or `ansible-playbook playbooks/deploy-audiobookshelf.yml`).
+
+### Mealie
+
+Mealie uses in-app Authelia OIDC for humans (same pattern as Audiobookshelf). Ansible backs up `services/mealie/data/` to `backups/mealie/<timestamp>/` before changes, creates a local **service admin** from `mealie.admin_username` / `mealie.admin_password` (for Homepage API tokens and break-glass access), removes Mealie's seeded placeholder user, optionally configures the group OpenAI provider from `mealie.openai_api_key`, fixes root-owned data dirs, and applies the container from rendered `compose.yaml`. Password login is hidden in the UI; family sign in via Authelia only.
+
+Bootstrap runs **after** Mealie has started once (so the database exists). The service admin is a local (`MEALIE` auth) account — OIDC users are unchanged. Break-glass local login: `https://food.${DOMAIN}/login?direct=1`.
+
+| Setting | Source in `homelab.yaml` |
+| --- | --- |
+| Service admin | `mealie.admin_username`, `mealie.admin_password` (min 8 chars) — automation / Homepage |
+| Service admin email (optional) | `mealie.admin_email` — defaults to `{admin_username}@mealie.local` |
+| OIDC client secret | `authelia.oidc_client_secret` (client id `mealie`) |
+| OpenAI (optional) | `mealie.openai_api_key` — recipe import / image services |
+| Authelia groups | `mealie-admins` → Mealie admin; `mealie-users` → regular user |
+
+On first install Mealie creates group **Home** and household **Family** by default. New OIDC users are placed there (`DEFAULT_GROUP` / `DEFAULT_HOUSEHOLD` in compose — change these if you rename the group/household in the UI). No extra household setup is required unless you want multiple households.
+
+```bash
+./bin/homelab deploy mealie
+# Run after deploy-authelia.yml, then deploy homepage
+```
 
 ### Jellyscope
 
@@ -380,6 +401,26 @@ Or run Ansible directly:
 ```bash
 ansible-playbook playbooks/site.yml --check --diff
 ansible-playbook playbooks/deploy-authelia.yml --check --diff
+```
+
+### Service backups (Mealie, Audiobookshelf, Jellyscope, Memos)
+
+Manual backups:
+
+```bash
+./bin/homelab backup mealie --label manual
+./bin/homelab backup --all
+./bin/homelab backup --list   # services included in --all
+```
+
+Before deploy changes, Ansible runs the same CLI (`homelab backup <name> --label deploy`). Each backup copies the full live tree at `services/<name>/` to `backups/<name>/<label>-<timestamp>/` (same layout — e.g. Mealie includes `data/`, `homepage_api_key`, etc.). Add `backup: true` to a service in [`config/services.yaml`](../config/services.yaml) to include it in `backup --all`.
+
+To restore:
+
+```bash
+docker stop mealie   # or the relevant container
+rsync -a --delete backups/mealie/<timestamp>/ services/mealie/
+docker start mealie
 ```
 
 Backups and Docker/API bootstrap steps are skipped in check mode. Template and `file` tasks (e.g. Authelia config, Homepage YAML, service data dirs) still run with `--diff` so you can preview changes even on a fresh install with no backup dir yet.

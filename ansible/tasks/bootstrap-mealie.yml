@@ -1,0 +1,35 @@
+---
+- name: Bootstrap Mealie (service admin, remove seed user, optional OpenAI)
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - "{{ playbook_dir }}/../scripts/bootstrap_mealie.py:/bootstrap_mealie.py:ro"
+      - -v
+      - "{{ data_dir }}/services/mealie/data:/data"
+      - -e
+      - MEALIE_DB=/data/mealie.db
+      - -e
+      - MEALIE_ADMIN_USERNAME={{ homelab_env.MEALIE_ADMIN_USERNAME }}
+      - -e
+      - MEALIE_ADMIN_PASSWORD={{ homelab_env.MEALIE_ADMIN_PASSWORD }}
+      - -e
+      - MEALIE_ADMIN_EMAIL={{ homelab_env.MEALIE_ADMIN_EMAIL | default('') }}
+      - -e
+      - MEALIE_DEFAULT_GROUP={{ homelab_env.MEALIE_DEFAULT_GROUP | default('Home') }}
+      - -e
+      - MEALIE_DEFAULT_HOUSEHOLD={{ homelab_env.MEALIE_DEFAULT_HOUSEHOLD | default('Family') }}
+      - -e
+      - MEALIE_OPENAI_API_KEY={{ homelab_env.MEALIE_OPENAI_API_KEY | default('') }}
+      - -e
+      - MEALIE_OPENAI_MODEL={{ homelab_env.MEALIE_OPENAI_MODEL | default('gpt-4o') }}
+      - python:3-alpine
+      - sh
+      - -c
+      - pip install -q bcrypt && python /bootstrap_mealie.py
+  register: mealie_bootstrap
+  changed_when: "'mealie bootstrap:' in mealie_bootstrap.stderr and 'nothing to change' not in mealie_bootstrap.stderr"
+  no_log: true
+  when: not ansible_check_mode
