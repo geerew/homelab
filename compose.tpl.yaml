@@ -720,9 +720,7 @@ services:
       - TZ={{ TZ }}
     volumes:
       - {{ DATA_DIR }}/services/sonarr/config:/config
-      - {{ MEDIA1_DIR }}:/media
-      - {{ MEDIA2_DIR }}:/media2
-      - {{ DOWNLOADS_DIR }}:/downloads
+{{BLOCK:sonarr_volumes}}
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true

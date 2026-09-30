@@ -1,0 +1,40 @@
+---
+- name: Check Sonarr config.xml exists
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/sonarr/config/config.xml"
+  register: sonarr_config_stat
+
+- name: Fail when Sonarr config is missing
+  ansible.builtin.fail:
+    msg: >-
+      {{ data_dir }}/services/sonarr/config/config.xml not found.
+      Run deploy sonarr first — Homepage reads the API key from Sonarr's config.
+  when:
+    - not ansible_check_mode
+    - not sonarr_config_stat.stat.exists
+
+- name: Read Sonarr API key from config.xml
+  ansible.builtin.slurp:
+    src: "{{ data_dir }}/services/sonarr/config/config.xml"
+  register: sonarr_config_xml
+  when: sonarr_config_stat.stat.exists | default(false)
+  no_log: true
+
+- name: Set Sonarr API key fact for Homepage
+  ansible.builtin.set_fact:
+    sonarr_api_key: >-
+      {{ sonarr_config_xml.content | b64decode | regex_search('(?<=<ApiKey>)[^<]+') }}
+  when:
+    - sonarr_config_xml.content is defined
+    - (sonarr_config_xml.content | b64decode | regex_search('(?<=<ApiKey>)[^<]+')) | length > 0
+  no_log: true
+
+- name: Fail when Sonarr API key is missing from config.xml
+  ansible.builtin.fail:
+    msg: >-
+      No ApiKey in {{ data_dir }}/services/sonarr/config/config.xml.
+      Start Sonarr once before deploy-homepage.
+  when:
+    - not ansible_check_mode
+    - sonarr_config_stat.stat.exists
+    - sonarr_api_key | default('') | length == 0

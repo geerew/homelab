@@ -70,6 +70,9 @@
 - name: Deploy Prowlarr
   ansible.builtin.import_playbook: deploy-prowlarr.yml
 
+- name: Deploy Sonarr
+  ansible.builtin.import_playbook: deploy-sonarr.yml
+
 - name: Deploy Radarr
   ansible.builtin.import_playbook: deploy-radarr.yml
 

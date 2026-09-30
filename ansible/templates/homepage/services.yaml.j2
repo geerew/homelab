@@ -80,7 +80,7 @@
         widget:
           type: sonarr
           url: http://gluetun:{{ homelab_env.SONARR_PORT | default('8989') }}
-          key: {{ homelab_env.HOMEPAGE_SONARR_API_KEY }}
+          key: {{ sonarr_api_key }}
 
     - Radarr:
         icon: sh-radarr

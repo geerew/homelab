@@ -81,7 +81,6 @@ uptime_kuma:
   prowlarr_url: ''
   dispatcharr_url: ''
 homepage:
-  sonarr_api_key: ''
   seerr_api_key: ''
   bazarr_api_key: ''
 
@@ -127,6 +126,53 @@ prowlarr:
       private: true
       username: ''
       password: ''
+sonarr:
+  volumes:
+    - host: /mnt/media1
+      container: /media
+    - host: /mnt/media2
+      container: /media2
+    - host: /downloads
+      container: /downloads
+  root_folders:
+    - /media/TV
+  indexers:
+    - Public Indexer
+    - Private Indexer
+  naming:
+    rename_episodes: true
+    standard_episode_format: "{Series Title} - s{season:00}e{episode:00} - {Episode Title}"
+    series_folder_format: "{Series Title}"
+    season_folder_format: "Season {season}"
+  library_import:
+    enabled: true
+  # TV runtimes vary (long episodes, season packs). Lower mins than Radarr movies.
+  quality_definitions:
+    720p:
+      min: 3
+      preferred: 15
+      max: 26
+    1080p:
+      min: 5
+      preferred: 50
+      max: 82
+  quality_profiles:
+    - name: HD-720p
+      cutoff: Bluray-720p
+      upgrade: false
+      qualities:
+        - HDTV-720p
+        - WEBDL-720p
+        - WEBRip-720p
+        - Bluray-720p
+    - name: HD-1080p
+      cutoff: Bluray-1080p
+      upgrade: false
+      qualities:
+        - HDTV-1080p
+        - WEBDL-1080p
+        - WEBRip-1080p
+        - Bluray-1080p
 radarr:
   volumes:
     - host: /mnt/media1

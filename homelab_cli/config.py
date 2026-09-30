@@ -212,7 +212,6 @@ def env_to_config(env: dict[str, str], users: dict[str, Any] | None = None, jwks
             "secret_key": env.get("JELLYSCOPE_SECRET_KEY", ""),
         },
         "homepage": {
-            "sonarr_api_key": env.get("HOMEPAGE_SONARR_API_KEY", ""),
             "seerr_api_key": env.get("HOMEPAGE_SEERR_API_KEY", ""),
             "bazarr_api_key": env.get("HOMEPAGE_BAZARR_API_KEY", ""),
         },
@@ -268,6 +267,7 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
     gl_ports = gl.get("ports", {})
     qb = cfg.get("qbittorrent", {})
     prowlarr = cfg.get("prowlarr", {})
+    sonarr = cfg.get("sonarr", {})
     radarr = cfg.get("radarr", {})
     media = cfg.get("media", {})
     abs_cfg = cfg.get("audiobookshelf", {})
@@ -295,6 +295,25 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
             }
             for idx in prowlarr_indexers
         ]
+    )
+
+    sonarr_indexers_json = json.dumps(sonarr.get("indexers", []))
+    sonarr_download_clients_json = json.dumps(sonarr.get("download_clients", []))
+    sonarr_root_folders_json = json.dumps(sonarr.get("root_folders", []))
+    sonarr_naming_json = json.dumps(sonarr.get("naming", {}))
+    sonarr_media_management_json = json.dumps(sonarr.get("media_management", {}))
+    sonarr_qualities_json = json.dumps(sonarr.get("qualities", {}))
+    sonarr_quality_profiles_json = json.dumps(sonarr.get("quality_profiles", []))
+    sonarr_quality_definitions_json = json.dumps(sonarr.get("quality_definitions", {}))
+    library_import_sonarr = sonarr.get("library_import", {})
+    sonarr_library_import_json = json.dumps(
+        {
+            "enabled": library_import_sonarr.get("enabled", True),
+            "quality_profile": library_import_sonarr.get("quality_profile", ""),
+            "monitor": library_import_sonarr.get("monitor", "none"),
+            "season_folder": library_import_sonarr.get("season_folder", True),
+            "monitor_new_items": library_import_sonarr.get("monitor_new_items", "all"),
+        }
     )
 
     radarr_indexers_json = json.dumps(radarr.get("indexers", []))
@@ -441,7 +460,15 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "JELLYSCOPE_ADMIN_USERNAME": str(js.get("admin_username", "admin")),
         "JELLYSCOPE_ADMIN_PASSWORD": str(js.get("admin_password", "")),
         "JELLYSCOPE_SECRET_KEY": str(js.get("secret_key", "")),
-        "HOMEPAGE_SONARR_API_KEY": str(hp.get("sonarr_api_key", "")),
+        "SONARR_ROOT_FOLDERS": sonarr_root_folders_json,
+        "SONARR_INDEXERS": sonarr_indexers_json,
+        "SONARR_DOWNLOAD_CLIENTS": sonarr_download_clients_json,
+        "SONARR_NAMING": sonarr_naming_json,
+        "SONARR_MEDIA_MANAGEMENT": sonarr_media_management_json,
+        "SONARR_QUALITIES": sonarr_qualities_json,
+        "SONARR_QUALITY_PROFILES": sonarr_quality_profiles_json,
+        "SONARR_QUALITY_DEFINITIONS": sonarr_quality_definitions_json,
+        "SONARR_LIBRARY_IMPORT": sonarr_library_import_json,
         "HOMEPAGE_SEERR_API_KEY": str(hp.get("seerr_api_key", "")),
         "HOMEPAGE_BAZARR_API_KEY": str(hp.get("bazarr_api_key", "")),
         "MCCLEAN_ADMIN_USERNAME": str(mc.get("admin_username", "admin")),

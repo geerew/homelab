@@ -1,0 +1,28 @@
+---
+- name: Bootstrap Sonarr settings from homelab.yaml
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ playbook_dir }}/../scripts/bootstrap_sonarr.py"
+  environment:
+    SONARR_URL: "http://127.0.0.1:{{ homelab_env.SONARR_PORT | default('8989') }}"
+    SONARR_CONFIG_XML: "{{ data_dir }}/services/sonarr/config/config.xml"
+    PROWLARR_URL: "http://127.0.0.1:{{ homelab_env.PROWLARR_PORT | default('9696') }}"
+    PROWLARR_CONFIG_XML: "{{ data_dir }}/services/prowlarr/config/config.xml"
+    PROWLARR_PORT: "{{ homelab_env.PROWLARR_PORT | default('9696') }}"
+    SONARR_ROOT_FOLDERS: "{{ homelab_env.SONARR_ROOT_FOLDERS }}"
+    SONARR_INDEXERS: "{{ homelab_env.SONARR_INDEXERS }}"
+    SONARR_DOWNLOAD_CLIENTS: "{{ homelab_env.SONARR_DOWNLOAD_CLIENTS }}"
+    SONARR_NAMING: "{{ homelab_env.SONARR_NAMING }}"
+    SONARR_MEDIA_MANAGEMENT: "{{ homelab_env.SONARR_MEDIA_MANAGEMENT }}"
+    SONARR_QUALITIES: "{{ homelab_env.SONARR_QUALITIES | default('{}') }}"
+    SONARR_QUALITY_PROFILES: "{{ homelab_env.SONARR_QUALITY_PROFILES }}"
+    SONARR_QUALITY_DEFINITIONS: "{{ homelab_env.SONARR_QUALITY_DEFINITIONS | default('{}') }}"
+    SONARR_LIBRARY_IMPORT: "{{ homelab_env.SONARR_LIBRARY_IMPORT | default('{\"enabled\": true}') }}"
+    QBITTORRENT_WEBUI_PORT: "{{ homelab_env.QBITTORRENT_WEBUI_PORT | default('9865') }}"
+    QBITTORRENT_WEBUI_USERNAME: "{{ homelab_env.QBITTORRENT_WEBUI_USERNAME }}"
+    QBITTORRENT_WEBUI_PASSWORD: "{{ homelab_env.QBITTORRENT_WEBUI_PASSWORD }}"
+  register: sonarr_bootstrap
+  changed_when: "'nothing to change' not in sonarr_bootstrap.stderr"
+  no_log: true
+  when: not ansible_check_mode

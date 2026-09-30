@@ -1,0 +1,90 @@
+---
+- name: Deploy Sonarr
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Sonarr variables in homelab.yaml
+      ansible.builtin.assert:
+        that:
+          - homelab_config.sonarr.volumes is defined
+          - homelab_config.sonarr.volumes | length > 0
+          - homelab_env.SONARR_ROOT_FOLDERS is defined
+          - homelab_env.SONARR_ROOT_FOLDERS | from_json | length > 0
+          - homelab_env.SONARR_INDEXERS is defined
+          - homelab_env.SONARR_INDEXERS | from_json | length > 0
+          - homelab_env.QBITTORRENT_WEBUI_USERNAME is defined
+          - homelab_env.QBITTORRENT_WEBUI_USERNAME | length > 0
+          - homelab_env.QBITTORRENT_WEBUI_PASSWORD is defined
+          - homelab_env.QBITTORRENT_WEBUI_PASSWORD | length > 0
+        fail_msg: >-
+          Set sonarr.volumes, root_folders, indexers, and qbittorrent.webui_* in
+          {{ homelab_config_file }} (see homelab.example.yaml).
+      when: not ansible_check_mode
+
+    - name: Validate Sonarr indexers reference Prowlarr
+      ansible.builtin.assert:
+        that:
+          - (item is string and item | length > 0)
+            or (item.prowlarr_indexer is defined and item.prowlarr_indexer | length > 0)
+        fail_msg: >-
+          Each sonarr.indexers entry must be a Prowlarr indexer name (string) or
+          { prowlarr_indexer: ... } in {{ homelab_config_file }}.
+      loop: "{{ homelab_env.SONARR_INDEXERS | from_json }}"
+      loop_control:
+        label: "{{ item.prowlarr_indexer | default(item) }}"
+      when: not ansible_check_mode
+
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: sonarr
+      when: not ansible_check_mode
+
+    - name: Ensure Sonarr config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/sonarr/config"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Regenerate compose.yaml with current Sonarr volume mounts
+      ansible.builtin.command:
+        cmd: python3 bin/homelab compose generate
+        chdir: "{{ homelab_dir }}"
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: sonarr
+
+    - name: Wait for Sonarr HTTP health
+      ansible.builtin.command:
+        argv:
+          - curl
+          - -fsS
+          - "http://127.0.0.1:{{ homelab_env.SONARR_PORT | default('8989') }}/ping"
+      register: sonarr_health_wait
+      until: sonarr_health_wait.rc == 0
+      retries: 24
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/bootstrap-sonarr.yml
+
+    - name: Report Sonarr deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to deploy Sonarr from {{ homelab_config_file }}.
+          {% elif sonarr_bootstrap.changed | default(false) %}
+          Sonarr configured — external auth enforced, settings applied from homelab.yaml.
+          {% else %}
+          Sonarr unchanged — settings already in sync with homelab.yaml.
+          {% endif %}

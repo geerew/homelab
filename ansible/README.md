@@ -42,6 +42,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
 | `playbooks/deploy-prowlarr.yml` | Prowlarr external auth (hardcoded) + Cardigann indexers from `homelab.yaml`; backs up full service dir |
+| `playbooks/deploy-sonarr.yml` | Sonarr volumes, root folders, Prowlarr indexers, qBittorrent, profiles from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-radarr.yml` | Radarr volumes, root folders, Prowlarr indexers, qBittorrent, profiles from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
 | `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
@@ -94,6 +95,9 @@ ansible-playbook playbooks/deploy-qbittorrent.yml
 # Deploy Prowlarr (auth + indexers from homelab.yaml)
 ansible-playbook playbooks/deploy-prowlarr.yml
 
+# Deploy Sonarr (paths, indexers, download client, profiles from homelab.yaml)
+ansible-playbook playbooks/deploy-sonarr.yml
+
 # Deploy Radarr (paths, indexers, download client, profiles from homelab.yaml)
 ansible-playbook playbooks/deploy-radarr.yml
 
@@ -126,7 +130,8 @@ Run `site.yml` before any deploy playbook — Socket Proxy must be up before Tra
 | 10 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
 | 11 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
 | 12 | `deploy-prowlarr.yml` | Gluetun + Prowlarr on `:9696` |
-| 13 | `deploy-radarr.yml` | Gluetun + Prowlarr indexers; qBittorrent creds from yaml |
+| 13 | `deploy-sonarr.yml` | Gluetun + Prowlarr indexers; qBittorrent creds from yaml |
+| 14 | `deploy-radarr.yml` | Gluetun + Prowlarr indexers; qBittorrent creds from yaml |
 | 14 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
 | 15 | `deploy-homepage.yml` | — (last) |
 
@@ -218,8 +223,9 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Audiobookshelf | Auto — API key named `homepage` in `services/audiobookshelf/homepage_api_key` (see `deploy-homepage.yml`) |
 | Mealie | Auto — long-lived token named `homepage` in `services/mealie/homepage_api_key` (owned by `mealie.admin_username` service account; run `deploy mealie` first) |
 | Prowlarr | Auto — API key from `services/prowlarr/config/config.xml` (run `deploy prowlarr` first) |
+| Sonarr | Auto — API key from `services/sonarr/config/config.xml` (run `deploy sonarr` first) |
 | Radarr | Auto — API key from `services/radarr/config/config.xml` (run `deploy radarr` first) |
-| Sonarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
+| Bazarr | `HOMEPAGE_BAZARR_API_KEY` |
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
 | Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
 | Dispatcharr | `DISPATCHARR_ADMIN_*` |
@@ -381,6 +387,28 @@ Sonarr/Radarr should **not** use Prowlarr Applications sync. Add Torznab indexer
 ```bash
 ansible-playbook playbooks/deploy-prowlarr.yml
 # Run after deploy-gluetun.yml (Prowlarr shares Gluetun's network)
+```
+
+### Sonarr
+
+Sonarr settings are managed from `homelab.yaml` (`sonarr.*`). Auth is always **external** (Authelia at Traefik). The playbook backs up the full `services/sonarr/` tree, regenerates compose volume mounts, and bootstraps via API.
+
+| Setting | `homelab.yaml` key |
+| --- | --- |
+| Volume mounts | `sonarr.volumes[]` — `host` / `container` (like Radarr) |
+| Library root paths | `sonarr.root_folders[]` — container paths (e.g. `/media/TV Shows`) |
+| Indexers | `sonarr.indexers[]` — Prowlarr name (string) or `{ name?, prowlarr_indexer }` |
+| Download client | Defaults to qBittorrent; optional `sonarr.download_clients[]` overrides |
+| Naming | `sonarr.naming` — e.g. `rename_episodes`, `standard_episode_format`, folder formats |
+| Media management | `sonarr.media_management` — optional overrides only |
+| Quality profiles | `sonarr.quality_profiles[]` — `name`, `cutoff`, `qualities[]` |
+| Quality definitions | `sonarr.quality_definitions` — min/preferred/max in **MB/min** per tier |
+| Library import | `sonarr.library_import` — mirrors UI library import: unmapped folders → TVDB lookup, bulk import with `monitor: none` by default |
+| Homepage widget | Auto — API key read from `config.xml` by `deploy-homepage.yml` |
+
+```bash
+ansible-playbook playbooks/deploy-sonarr.yml
+# Run after deploy-prowlarr.yml and deploy-qbittorrent.yml
 ```
 
 ### Radarr

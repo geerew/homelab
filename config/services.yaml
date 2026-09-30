@@ -50,7 +50,8 @@ services:
     deploy_playbook: deploy-qbittorrent.yml
     stack: gluetun_vpn
   sonarr:
-    deploy_playbook: null
+    deploy_playbook: deploy-sonarr.yml
+    backup: true
     stack: gluetun_vpn
   radarr:
     deploy_playbook: deploy-radarr.yml
