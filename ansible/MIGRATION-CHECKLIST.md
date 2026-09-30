@@ -343,7 +343,7 @@ Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sona
 | --- | --- | --- | --- |
 | **Sonarr** | ⬜ | `services/sonarr/config/config.xml` + DB | `deploy-sonarr.yml` — root folders, qBittorrent download client, Prowlarr indexer sync, API key → `.env` for Homepage/Kuma |
 | **Radarr** | ⬜ | `services/radarr/config/config.xml` + DB | `deploy-radarr.yml` — same pattern as Sonarr |
-| **Prowlarr** | ⬜ | `services/prowlarr/config/config.xml` + DB | `deploy-prowlarr.yml` — indexers, app sync to Sonarr/Radarr |
+| **Prowlarr** | ✅ | `homelab.yaml` + `services/prowlarr/config/` | `deploy-prowlarr.yml` — external auth (hardcoded) + Cardigann indexers from yaml; Sonarr/Radarr pull via Torznab (no Applications sync) |
 | **Bazarr** | ⬜ | `services/bazarr/config/` | `deploy-bazarr.yml` — language profiles, links to Sonarr/Radarr |
 | **Seerr** | ⬜ | `services/seerr/config/` | `deploy-seerr.yml` — Jellyfin/Plex link, Sonarr/Radarr, OIDC |
 
@@ -373,14 +373,15 @@ Work top-to-bottom; each step should leave the stack usable.
 2. ~~**Traefik**~~ — done (static + Authelia middleware in Ansible; service routes stay on Compose labels)
 3. ~~**Homepage**~~ — done (services template + static YAML + widget keys in `.env`)
 4. ~~**Gluetun**~~ — done (VPN in `.env`, auth roles in Ansible)
-5. **Sonarr → Radarr → Prowlarr → Bazarr** — *arr chain; share patterns (API + `config.xml` snippets)
-6. **Seerr** — depends on Jellyfin + *arr
-7. **Jellyfin** — libraries, OIDC, encoding (biggest remaining gap)
-8. **Audiobookshelf / Mealie** — OIDC clients overlap with Authelia work
-9. ~~**Uptime Kuma + Autokuma**~~ — done (AutoKuma monitors from labels; Ansible syncs `/status/default` groups)
-10. ~~**Memos**~~ — done (Authelia OIDC via `/etc/secrets`)
-11. ~~**Jellyscope**~~ — done (admin + Jellyfin key from Ansible)
-12. **Sparky Fitness / McClean** — as needed
+5. ~~**Prowlarr**~~ — done (indexers from `homelab.yaml`; Sonarr/Radarr pull via Torznab)
+6. **Sonarr → Radarr → Bazarr** — *arr chain; share patterns (API + Torznab to Prowlarr)
+7. **Seerr** — depends on Jellyfin + *arr
+8. **Jellyfin** — libraries, OIDC, encoding (biggest remaining gap)
+9. **Audiobookshelf / Mealie** — OIDC clients overlap with Authelia work
+10. ~~**Uptime Kuma + Autokuma**~~ — done (AutoKuma monitors from labels; Ansible syncs `/status/default` groups)
+11. ~~**Memos**~~ — done (Authelia OIDC via `/etc/secrets`)
+12. ~~**Jellyscope**~~ — done (admin + Jellyfin key from Ansible)
+13. **Sparky Fitness / McClean** — as needed
 
 ---
 

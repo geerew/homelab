@@ -212,8 +212,6 @@ def env_to_config(env: dict[str, str], users: dict[str, Any] | None = None, jwks
             "secret_key": env.get("JELLYSCOPE_SECRET_KEY", ""),
         },
         "homepage": {
-            "audiobookshelf_api_key": env.get("HOMEPAGE_AUDIOBOOKSHELF_API_KEY", ""),
-            "mealie_api_key": env.get("HOMEPAGE_MEALIE_API_KEY", ""),
             "sonarr_api_key": env.get("HOMEPAGE_SONARR_API_KEY", ""),
             "radarr_api_key": env.get("HOMEPAGE_RADARR_API_KEY", ""),
             "prowlarr_api_key": env.get("HOMEPAGE_PROWLARR_API_KEY", ""),
@@ -271,6 +269,7 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
     gl = cfg.get("gluetun", {})
     gl_ports = gl.get("ports", {})
     qb = cfg.get("qbittorrent", {})
+    prowlarr = cfg.get("prowlarr", {})
     media = cfg.get("media", {})
     abs_cfg = cfg.get("audiobookshelf", {})
     kuma = cfg.get("uptime_kuma", {})
@@ -283,6 +282,22 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
     abs_vol_str = ",".join(f"{v['host']}:{v['container']}" for v in abs_volumes if v.get("host") and v.get("container"))
 
     libraries = abs_cfg.get("libraries", [])
+    prowlarr_indexers = prowlarr.get("indexers", [])
+    prowlarr_indexers_json = json.dumps(
+        [
+            {
+                "name": idx.get("name"),
+                "definition": idx.get("definition"),
+                "enable": idx.get("enable", True),
+                "private": idx.get("private", False),
+                **({"username": idx["username"]} if idx.get("username") is not None else {}),
+                **({"password": idx["password"]} if idx.get("password") is not None else {}),
+                **({"alt2fa_token": idx["alt2fa_token"]} if idx.get("alt2fa_token") else {}),
+            }
+            for idx in prowlarr_indexers
+        ]
+    )
+
     # bootstrap script expects mediaType in JSON
     lib_json = json.dumps(
         [
@@ -382,6 +397,7 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "QBITTORRENT_WEBUI_USERNAME": str(qb.get("webui_username", "admin")),
         "QBITTORRENT_WEBUI_PASSWORD": str(qb.get("webui_password", "")),
         "QBITTORRENT_LAN_AUTH_BYPASS": str(qb.get("lan_auth_bypass", "true")),
+        "PROWLARR_INDEXERS": prowlarr_indexers_json,
         "MEDIA1_DIR": str(media.get("media1_dir", "")),
         "MEDIA2_DIR": str(media.get("media2_dir", "")),
         "AUDIOBOOKS_DIR": str(media.get("audiobooks_dir", "")),
@@ -399,8 +415,6 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "JELLYSCOPE_ADMIN_USERNAME": str(js.get("admin_username", "admin")),
         "JELLYSCOPE_ADMIN_PASSWORD": str(js.get("admin_password", "")),
         "JELLYSCOPE_SECRET_KEY": str(js.get("secret_key", "")),
-        "HOMEPAGE_AUDIOBOOKSHELF_API_KEY": str(hp.get("audiobookshelf_api_key", "")),
-        "HOMEPAGE_MEALIE_API_KEY": str(hp.get("mealie_api_key", "")),
         "HOMEPAGE_SONARR_API_KEY": str(hp.get("sonarr_api_key", "")),
         "HOMEPAGE_RADARR_API_KEY": str(hp.get("radarr_api_key", "")),
         "HOMEPAGE_PROWLARR_API_KEY": str(hp.get("prowlarr_api_key", "")),

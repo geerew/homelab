@@ -56,7 +56,8 @@ services:
     deploy_playbook: null
     stack: gluetun_vpn
   prowlarr:
-    deploy_playbook: null
+    deploy_playbook: deploy-prowlarr.yml
+    backup: true
     stack: gluetun_vpn
   bazarr:
     deploy_playbook: null

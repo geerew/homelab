@@ -10,19 +10,6 @@
     path: "{{ data_dir }}/services/mealie/homepage_api_key"
   register: mealie_homepage_api_key_file
 
-- name: Migrate legacy Mealie API key from homelab.yaml
-  ansible.builtin.copy:
-    dest: "{{ data_dir }}/services/mealie/homepage_api_key"
-    content: "{{ homelab_env.HOMEPAGE_MEALIE_API_KEY | trim }}\n"
-    mode: "0600"
-  register: mealie_homepage_api_key_migrated
-  when:
-    - not ansible_check_mode
-    - not mealie_homepage_api_key_file.stat.exists or (mealie_homepage_api_key_file.stat.size | default(0)) == 0
-    - homelab_env.HOMEPAGE_MEALIE_API_KEY is defined
-    - homelab_env.HOMEPAGE_MEALIE_API_KEY | length > 0
-  no_log: true
-
 - name: Fix root-owned Mealie API key file (deploy only)
   ansible.builtin.command:
     argv:
@@ -72,9 +59,7 @@
       - -c
       - pip install -q PyJWT && python /ensure_mealie_api_key.py
   register: mealie_api_key_result
-  changed_when: >-
-    'created Mealie API token' in mealie_api_key_result.stderr
-    or (mealie_homepage_api_key_migrated.changed | default(false))
+  changed_when: "'created Mealie API token' in mealie_api_key_result.stderr"
   failed_when: mealie_api_key_result.rc != 0
   no_log: true
   when: not ansible_check_mode

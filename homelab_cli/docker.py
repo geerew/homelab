@@ -23,31 +23,43 @@ def up(services: list[str] | None = None, root: Path | None = None) -> None:
     render_compose()
     args = ["up", "-d"]
     if services:
-        args.extend(expand_services(services))
+        args.extend(expand_services(services, operation="up"))
     run_compose(args, root=root)
 
 
 def down(services: list[str] | None = None, root: Path | None = None) -> None:
     render_compose()
     if services:
-        run_compose(["stop", *expand_services(services)], root=root)
+        run_compose(["stop", *expand_services(services, operation="down")], root=root)
     else:
         run_compose(["down"], root=root)
 
 
 def start(services: list[str] | None = None, root: Path | None = None) -> None:
     render_compose()
-    targets = expand_services(services) if services else all_compose_services()
+    targets = (
+        expand_services(services, operation="start")
+        if services
+        else all_compose_services()
+    )
     run_compose(["start", *targets], root=root)
 
 
 def stop(services: list[str] | None = None, root: Path | None = None) -> None:
     render_compose()
-    targets = expand_services(services) if services else all_compose_services()
+    targets = (
+        expand_services(services, operation="stop")
+        if services
+        else all_compose_services()
+    )
     run_compose(["stop", *targets], root=root)
 
 
 def restart(services: list[str] | None = None, root: Path | None = None) -> None:
     render_compose()
-    targets = expand_services(services) if services else all_compose_services()
+    targets = (
+        expand_services(services, operation="restart")
+        if services
+        else all_compose_services()
+    )
     run_compose(["restart", *targets], root=root)

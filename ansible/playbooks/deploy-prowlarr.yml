@@ -1,0 +1,81 @@
+---
+- name: Deploy Prowlarr
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Prowlarr variables in homelab.yaml
+      ansible.builtin.assert:
+        that:
+          - homelab_env.PROWLARR_INDEXERS is defined
+          - homelab_env.PROWLARR_INDEXERS | length > 0
+          - homelab_env.PROWLARR_INDEXERS | from_json | length > 0
+        fail_msg: >-
+          Set prowlarr.indexers in {{ homelab_config_file }} (see homelab.example.yaml).
+          Private indexers need username and password.
+      when: not ansible_check_mode
+
+    - name: Validate private Prowlarr indexers have credentials
+      ansible.builtin.assert:
+        that:
+          - item.username is defined
+          - item.username | length > 0
+          - item.password is defined
+          - item.password | length > 0
+        fail_msg: >-
+          Private indexer '{{ item.name }}' in {{ homelab_config_file }} requires
+          username and password.
+      loop: "{{ homelab_env.PROWLARR_INDEXERS | from_json }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - not ansible_check_mode
+        - item.private | default(false)
+
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: prowlarr
+      when: not ansible_check_mode
+
+    - name: Ensure Prowlarr config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/prowlarr/config"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: prowlarr
+
+    - name: Wait for Prowlarr HTTP health
+      ansible.builtin.command:
+        argv:
+          - curl
+          - -fsS
+          - "http://127.0.0.1:{{ homelab_env.PROWLARR_PORT | default('9696') }}/ping"
+      register: prowlarr_health_wait
+      until: prowlarr_health_wait.rc == 0
+      retries: 24
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/bootstrap-prowlarr.yml
+
+    - name: Report Prowlarr deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to deploy Prowlarr from {{ homelab_config_file }}.
+          {% elif prowlarr_bootstrap.changed | default(false) %}
+          Prowlarr configured — external auth enforced, indexers applied from homelab.yaml.
+          Sonarr/Radarr should use Torznab at http://localhost:9696/{id}/ with the Prowlarr API key.
+          {% else %}
+          Prowlarr unchanged — external auth and indexers already in sync.
+          {% endif %}

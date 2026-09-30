@@ -19,9 +19,10 @@
 #  12. Gluetun          — VPN gateway; Sonarr/Radarr/Prowlarr/Bazarr/qBittorrent share its network
 #  11. Dispatcharr      — IPTV; Jellyfin Live TV M3U tuner points at its /output/m3u/
 #  12. qBittorrent      — WebUI config; LAN bypass uses traefik_network subnet from Gluetun stack
-#  13. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
-#  14. Jellyscope       — admin account + Jellyfin API key from Ansible
-#  15. Homepage         — service list + widgets reference the above (deploy last)
+#  13. Prowlarr         — auth + Cardigann indexers from homelab.yaml
+#  14. Jellyfin         — Live TV tuner registration requires Dispatcharr M3U to be populated
+#  15. Jellyscope       — admin account + Jellyfin API key from Ansible
+#  16. Homepage         — service list + widgets reference the above (deploy last)
 
 - name: Deploy Socket Proxy
   ansible.builtin.import_playbook: deploy-socket-proxy.yml
@@ -64,6 +65,9 @@
 
 - name: Deploy qBittorrent
   ansible.builtin.import_playbook: deploy-qbittorrent.yml
+
+- name: Deploy Prowlarr
+  ansible.builtin.import_playbook: deploy-prowlarr.yml
 
 - name: Deploy Jellyfin
   ansible.builtin.import_playbook: deploy-jellyfin.yml

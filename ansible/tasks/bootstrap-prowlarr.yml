@@ -1,0 +1,14 @@
+---
+- name: Bootstrap Prowlarr auth and indexers
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ playbook_dir }}/../scripts/bootstrap_prowlarr.py"
+  environment:
+    PROWLARR_URL: "http://127.0.0.1:{{ homelab_env.PROWLARR_PORT | default('9696') }}"
+    PROWLARR_CONFIG_XML: "{{ data_dir }}/services/prowlarr/config/config.xml"
+    PROWLARR_INDEXERS: "{{ homelab_env.PROWLARR_INDEXERS }}"
+  register: prowlarr_bootstrap
+  changed_when: "'nothing to change' not in prowlarr_bootstrap.stderr"
+  no_log: true
+  when: not ansible_check_mode

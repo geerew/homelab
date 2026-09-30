@@ -25,6 +25,7 @@ DEPLOY_ORDER: list[str] = [
     "gluetun",
     "dispatcharr",
     "qbittorrent",
+    "prowlarr",
     "jellyfin",
     "jellyscope",
     "homepage",
@@ -38,21 +39,54 @@ def load_registry(path: Path | None = None) -> dict[str, Any]:
     return data
 
 
-def expand_services(names: list[str], registry: dict[str, Any] | None = None) -> list[str]:
-    """Expand stack groups (e.g. gluetun → full VPN stack)."""
+def expand_services(
+    names: list[str],
+    registry: dict[str, Any] | None = None,
+    *,
+    operation: str = "stop",
+) -> list[str]:
+    """Expand stack groups when starting; stop/down/restart only named services.
+
+    Gluetun sidecars share `network_mode: service:gluetun`. Bringing up gluetun
+    (or any sidecar) ensures the gateway is running; stopping one sidecar must not
+    stop the whole VPN stack.
+    """
     reg = registry or load_registry()
     stacks: dict[str, list[str]] = reg.get("stacks", {})
     services: dict[str, Any] = reg.get("services", {})
     expanded: list[str] = []
     seen: set[str] = set()
 
+    def add(member: str) -> None:
+        if member not in seen:
+            seen.add(member)
+            expanded.append(member)
+
     for name in names:
         stack_name = services.get(name, {}).get("stack")
-        members = stacks.get(stack_name, [name]) if stack_name else [name]
-        for member in members:
-            if member not in seen:
-                seen.add(member)
-                expanded.append(member)
+        stack_members = stacks.get(stack_name, [name]) if stack_name else [name]
+
+        if operation in ("stop", "down"):
+            add(name)
+        elif operation == "restart":
+            if name == "gluetun" and stack_name:
+                for member in stack_members:
+                    add(member)
+            else:
+                add(name)
+        elif operation in ("start", "up"):
+            if name == "gluetun" and stack_name:
+                for member in stack_members:
+                    add(member)
+            elif stack_name and "gluetun" in stack_members:
+                add("gluetun")
+                add(name)
+            else:
+                add(name)
+        else:
+            for member in stack_members:
+                add(member)
+
     return expanded
 
 

@@ -41,6 +41,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-dispatcharr.yml` | Bootstrap admin + M3U/XC provider + logical channel groups (idempotent) |
 | `playbooks/deploy-gluetun.yml` | Render Gluetun `config.toml` from template + `.env` |
 | `playbooks/deploy-qbittorrent.yml` | Apply qBittorrent WebUI credentials, port + LAN auth bypass from `.env` |
+| `playbooks/deploy-prowlarr.yml` | Prowlarr external auth (hardcoded) + Cardigann indexers from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
 | `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
 | `playbooks/deploy-jellyscope.yml` | Bootstrap Jellyscope admin + ensure Jellyfin API key; sync connection settings |
@@ -89,6 +90,9 @@ ansible-playbook playbooks/deploy-gluetun.yml
 # Deploy qBittorrent WebUI settings (port + LAN auth bypass from .env)
 ansible-playbook playbooks/deploy-qbittorrent.yml
 
+# Deploy Prowlarr (auth + indexers from homelab.yaml)
+ansible-playbook playbooks/deploy-prowlarr.yml
+
 # Deploy Homepage config (widget creds/keys from .env)
 ansible-playbook playbooks/deploy-homepage.yml
 
@@ -117,8 +121,9 @@ Run `site.yml` before any deploy playbook — Socket Proxy must be up before Tra
 | 9 | `deploy-gluetun.yml` | Compose stack up |
 | 10 | `deploy-dispatcharr.yml` | Dispatcharr on `:9191` |
 | 11 | `deploy-qbittorrent.yml` | Gluetun + sidecars running |
-| 12 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
-| 13 | `deploy-homepage.yml` | — (last) |
+| 12 | `deploy-prowlarr.yml` | Gluetun + Prowlarr on `:9696` |
+| 13 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
+| 14 | `deploy-homepage.yml` | — (last) |
 
 Use `deploy-services.yml` to run steps 1–13 in this order automatically.
 
@@ -353,6 +358,23 @@ When `QBITTORRENT_LAN_AUTH_BYPASS=true` (default): Traefik and Homepage (on `tra
 The playbook backs up the live config to `qBittorrent.conf.bak` before changes. A snapshot of your pre-Ansible config is kept at [`files/qbittorrent/qBittorrent.conf.backup`](files/qbittorrent/qBittorrent.conf.backup).
 
 On an **existing** install, deploy only updates WebUI auth keys (username, password, port, whitelist) so other preferences changed in the qBittorrent UI are preserved. On a **fresh** install, the full baseline config is rendered from [`templates/qbittorrent/qBittorrent.conf.j2`](templates/qbittorrent/qBittorrent.conf.j2).
+
+### Prowlarr
+
+Cardigann indexers are managed from `homelab.yaml` (`prowlarr.indexers`). Auth is always **external** (Authelia at Traefik via `Remote-User` header) — enforced by bootstrap, not configurable in yaml. The playbook backs up the full `services/prowlarr/` tree before changes.
+
+| Setting | `homelab.yaml` key |
+| --- | --- |
+| Indexers | `prowlarr.indexers[]` — `name`, `definition` (Cardigann id), `enable`, `private` |
+| Private creds | `username`, `password` on indexers where `private: true` (tracker site login, not Prowlarr) |
+| API / Homepage | Prowlarr API key in `config.xml` / `homepage.prowlarr_api_key` |
+
+Sonarr/Radarr should **not** use Prowlarr Applications sync. Add Torznab indexers pointing at `http://localhost:9696/{prowlarr_indexer_id}/` with the Prowlarr API key from `config.xml` (also in `homepage.prowlarr_api_key`).
+
+```bash
+ansible-playbook playbooks/deploy-prowlarr.yml
+# Run after deploy-gluetun.yml (Prowlarr shares Gluetun's network)
+```
 
 ### Jellyfin branding
 
