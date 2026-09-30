@@ -82,7 +82,6 @@ uptime_kuma:
   dispatcharr_url: ''
 homepage:
   sonarr_api_key: ''
-  radarr_api_key: ''
   seerr_api_key: ''
   bazarr_api_key: ''
 

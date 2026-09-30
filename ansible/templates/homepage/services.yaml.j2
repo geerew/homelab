@@ -91,7 +91,7 @@
         widget:
           type: radarr
           url: http://gluetun:{{ homelab_env.RADARR_PORT | default('7878') }}
-          key: {{ homelab_env.HOMEPAGE_RADARR_API_KEY }}
+          key: {{ radarr_api_key }}
 
     - Prowlarr:
         icon: sh-prowlarr

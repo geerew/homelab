@@ -1,0 +1,40 @@
+---
+- name: Check Radarr config.xml exists
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/radarr/config/config.xml"
+  register: radarr_config_stat
+
+- name: Fail when Radarr config is missing
+  ansible.builtin.fail:
+    msg: >-
+      {{ data_dir }}/services/radarr/config/config.xml not found.
+      Run deploy radarr first — Homepage reads the API key from Radarr's config.
+  when:
+    - not ansible_check_mode
+    - not radarr_config_stat.stat.exists
+
+- name: Read Radarr API key from config.xml
+  ansible.builtin.slurp:
+    src: "{{ data_dir }}/services/radarr/config/config.xml"
+  register: radarr_config_xml
+  when: radarr_config_stat.stat.exists | default(false)
+  no_log: true
+
+- name: Set Radarr API key fact for Homepage
+  ansible.builtin.set_fact:
+    radarr_api_key: >-
+      {{ radarr_config_xml.content | b64decode | regex_search('(?<=<ApiKey>)[^<]+') }}
+  when:
+    - radarr_config_xml.content is defined
+    - (radarr_config_xml.content | b64decode | regex_search('(?<=<ApiKey>)[^<]+')) | length > 0
+  no_log: true
+
+- name: Fail when Radarr API key is missing from config.xml
+  ansible.builtin.fail:
+    msg: >-
+      No ApiKey in {{ data_dir }}/services/radarr/config/config.xml.
+      Start Radarr once before deploy-homepage.
+  when:
+    - not ansible_check_mode
+    - radarr_config_stat.stat.exists
+    - radarr_api_key | default('') | length == 0

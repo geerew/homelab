@@ -218,7 +218,8 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Audiobookshelf | Auto — API key named `homepage` in `services/audiobookshelf/homepage_api_key` (see `deploy-homepage.yml`) |
 | Mealie | Auto — long-lived token named `homepage` in `services/mealie/homepage_api_key` (owned by `mealie.admin_username` service account; run `deploy mealie` first) |
 | Prowlarr | Auto — API key from `services/prowlarr/config/config.xml` (run `deploy prowlarr` first) |
-| Sonarr, Radarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
+| Radarr | Auto — API key from `services/radarr/config/config.xml` (run `deploy radarr` first) |
+| Sonarr, Bazarr | `HOMEPAGE_SONARR_API_KEY`, etc. |
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
 | Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
 | Dispatcharr | `DISPATCHARR_ADMIN_*` |
@@ -398,6 +399,7 @@ Radarr settings are managed from `homelab.yaml` (`radarr.*`). Auth is always **e
 | Quality profiles | `radarr.quality_profiles[]` — `name`, `cutoff`, `qualities[]` (which source types are allowed) |
 | Quality definitions | `radarr.quality_definitions` — min/preferred/max in **MB/min** per quality or tier (`720p`, `1080p`); rejects releases outside size range |
 | Library import | `radarr.library_import` — mirrors UI library import: scans root folders for unmapped folders, TMDB lookup, bulk import with `monitor: none` and quality profile `Any` by default; set `enabled: false` to skip |
+| Homepage widget | Auto — API key read from `config.xml` by `deploy-homepage.yml` |
 
 Deploy **prowlarr** before radarr (indexers resolve Prowlarr ids at bootstrap time). qBittorrent credentials come from `qbittorrent.webui_*`.
 

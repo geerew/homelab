@@ -213,7 +213,6 @@ def env_to_config(env: dict[str, str], users: dict[str, Any] | None = None, jwks
         },
         "homepage": {
             "sonarr_api_key": env.get("HOMEPAGE_SONARR_API_KEY", ""),
-            "radarr_api_key": env.get("HOMEPAGE_RADARR_API_KEY", ""),
             "seerr_api_key": env.get("HOMEPAGE_SEERR_API_KEY", ""),
             "bazarr_api_key": env.get("HOMEPAGE_BAZARR_API_KEY", ""),
         },
@@ -443,7 +442,6 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "JELLYSCOPE_ADMIN_PASSWORD": str(js.get("admin_password", "")),
         "JELLYSCOPE_SECRET_KEY": str(js.get("secret_key", "")),
         "HOMEPAGE_SONARR_API_KEY": str(hp.get("sonarr_api_key", "")),
-        "HOMEPAGE_RADARR_API_KEY": str(hp.get("radarr_api_key", "")),
         "HOMEPAGE_SEERR_API_KEY": str(hp.get("seerr_api_key", "")),
         "HOMEPAGE_BAZARR_API_KEY": str(hp.get("bazarr_api_key", "")),
         "MCCLEAN_ADMIN_USERNAME": str(mc.get("admin_username", "admin")),
