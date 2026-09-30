@@ -1,0 +1,17 @@
+---
+- name: Ensure Jellyfin config directory exists for encoding
+  ansible.builtin.file:
+    path: "{{ jellyfin_encoding_config_dir }}"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+
+- name: Render Jellyfin encoding.xml for VAAPI transcoding
+  ansible.builtin.template:
+    src: ../templates/jellyfin/encoding.xml.j2
+    dest: "{{ jellyfin_encoding_config_dir }}/encoding.xml"
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0644"
+  register: jellyfin_encoding_config

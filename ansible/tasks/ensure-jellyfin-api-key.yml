@@ -1,13 +1,13 @@
 ---
 - name: Check Jellyfin database exists
   ansible.builtin.stat:
-    path: "{{ data_dir }}/services/jellyfin/config/data/jellyfin.db"
+    path: "{{ jellyfin_db_path | default(data_dir ~ '/services/jellyfin/config/data/jellyfin.db') }}"
   register: jellyfin_db_stat
 
 - name: Fail when Jellyfin database is missing
   ansible.builtin.fail:
     msg: >-
-      {{ data_dir }}/services/jellyfin/config/data/jellyfin.db not found.
+      {{ jellyfin_db_path | default(data_dir ~ '/services/jellyfin/config/data/jellyfin.db') }} not found.
       Start Jellyfin once before {{ jellyfin_api_key_app_name | default('jellyscope') }}.
   when:
     - not ansible_check_mode
@@ -23,7 +23,7 @@
       - --app-name
       - "{{ jellyfin_api_key_app_name | default('jellyscope') }}"
       - --jellyfin-db
-      - "{{ data_dir }}/services/jellyfin/config/data/jellyfin.db"
+      - "{{ jellyfin_db_path | default(data_dir ~ '/services/jellyfin/config/data/jellyfin.db') }}"
   register: jellyfin_api_key_result
   changed_when: "'created Jellyfin API key' in jellyfin_api_key_result.stderr"
   when: not ansible_check_mode

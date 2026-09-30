@@ -1,0 +1,122 @@
+---
+- name: Remove legacy HDHomeRun tuner from Jellyfin
+  ansible.builtin.uri:
+    url: "{{ jellyfin_base_url }}/LiveTv/TunerHosts?id={{ jellyfin_livetv_legacy_hdhr_tuner_id }}"
+    method: DELETE
+    headers:
+      Authorization: "{{ jellyfin_api_auth_header }}"
+    status_code: [204, 404]
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_legacy_hdhr_tuner_id | default('') | length > 0
+
+- name: Register Dispatcharr M3U tuner with Jellyfin
+  ansible.builtin.uri:
+    url: "{{ jellyfin_base_url }}/LiveTv/TunerHosts"
+    method: POST
+    headers:
+      Authorization: "{{ jellyfin_api_auth_header }}"
+    body_format: json
+    body:
+      Id: "{{ jellyfin_livetv_tuner_id }}"
+      Url: "{{ jellyfin_livetv_m3u_url }}"
+      Type: m3u
+      FriendlyName: Dispatcharr
+      EnableStreamLooping: true
+      TunerCount: 0
+      IgnoreDts: true
+      ReadAtNativeFramerate: true
+    status_code: 200
+  when: not ansible_check_mode
+
+- name: Check Dispatcharr M3U output before Jellyfin channel re-import
+  ansible.builtin.uri:
+    url: "{{ jellyfin_dispatcharr_m3u_check_url | default('http://127.0.0.1:9191/output/m3u/') }}"
+    return_content: true
+    status_code: 200
+  register: jellyfin_dispatcharr_m3u_check
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_config.changed | default(false)
+
+- name: Set Jellyfin Live TV re-import flag
+  ansible.builtin.set_fact:
+    jellyfin_livetv_reimport: >-
+      {{ jellyfin_dispatcharr_m3u_check.content is search('#EXTINF') }}
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_config.changed | default(false)
+
+- name: Warn when skipping Jellyfin channel re-import (Dispatcharr M3U empty)
+  ansible.builtin.debug:
+    msg: >-
+      Skipping Jellyfin Live TV channel wipe/re-import — Dispatcharr M3U at
+      {{ jellyfin_livetv_m3u_url }} has no channels. Run deploy-dispatcharr.yml
+      first, then re-run this playbook.
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_config.changed | default(false)
+    - not jellyfin_livetv_reimport | default(false)
+
+- name: List Jellyfin Live TV channels before refresh
+  ansible.builtin.uri:
+    url: "{{ jellyfin_base_url }}/Items?IncludeItemTypes=TvChannel&Recursive=true&Limit=500"
+    headers:
+      Authorization: "{{ jellyfin_api_auth_header }}"
+    status_code: 200
+  register: jellyfin_livetv_channels_before
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_reimport | default(false)
+
+- name: Build Jellyfin Live TV channel delete list
+  ansible.builtin.set_fact:
+    jellyfin_livetv_channel_ids: >-
+      {{
+        jellyfin_livetv_channels_before.json.Items
+        | map(attribute='Id')
+        | list
+      }}
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_reimport | default(false)
+
+- name: Delete stale Jellyfin Live TV channels
+  ansible.builtin.uri:
+    url: "{{ jellyfin_base_url }}/Items?Ids={{ item | join(',') }}"
+    method: DELETE
+    headers:
+      Authorization: "{{ jellyfin_api_auth_header }}"
+    status_code: 204
+  loop: "{{ jellyfin_livetv_channel_ids | batch(50) | list }}"
+  loop_control:
+    label: "{{ item | length }} channel(s)"
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_reimport | default(false)
+    - jellyfin_livetv_channel_ids | length > 0
+
+- name: Refresh Jellyfin Live TV channels
+  ansible.builtin.uri:
+    url: "{{ jellyfin_base_url }}/ScheduledTasks/Running/{{ jellyfin_refresh_channels_task_id }}"
+    method: POST
+    headers:
+      Authorization: "{{ jellyfin_api_auth_header }}"
+    status_code: 204
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_reimport | default(false)
+
+- name: Wait for Jellyfin Live TV channel import
+  ansible.builtin.uri:
+    url: "{{ jellyfin_base_url }}/LiveTv/Channels?Limit=1"
+    headers:
+      Authorization: "{{ jellyfin_api_auth_header }}"
+    status_code: 200
+  register: jellyfin_livetv_channels_after
+  until: jellyfin_livetv_channels_after.json.TotalRecordCount | int > 0
+  retries: 12
+  delay: 5
+  when:
+    - not ansible_check_mode
+    - jellyfin_livetv_reimport | default(false)

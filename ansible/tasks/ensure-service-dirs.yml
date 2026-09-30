@@ -35,6 +35,9 @@
     - jellyfin/config
     - jellyfin/cache
     - jellyfin/logs
+    - jellyfin-next/config
+    - jellyfin-next/cache
+    - jellyfin-next/logs
     - jellyscope/data
     - audiobookshelf/config
     - audiobookshelf/metadata

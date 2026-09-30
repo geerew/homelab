@@ -1,0 +1,17 @@
+---
+- name: Ensure Jellyfin branding config directory exists
+  ansible.builtin.file:
+    path: "{{ jellyfin_branding_config_dir }}"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+
+- name: Render Jellyfin branding.xml from template
+  ansible.builtin.template:
+    src: ../templates/jellyfin/branding.xml.j2
+    dest: "{{ jellyfin_branding_config_dir }}/branding.xml"
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0644"
+  register: jellyfin_branding_config

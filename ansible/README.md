@@ -46,7 +46,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-radarr.yml` | Radarr volumes, root folders, Prowlarr indexers, qBittorrent, profiles from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-bazarr.yml` | Bazarr volumes, Sonarr/Radarr links, languages, providers from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
-| `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
+| `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin (libraries, plugins, SSO, VAAPI encoding, Live TV, branding/CSS); backs up full service dir |
 | `playbooks/deploy-jellyscope.yml` | Bootstrap Jellyscope admin + ensure Jellyfin API key; sync connection settings |
 | `playbooks/deploy-services.yml` | All deploy playbooks in dependency order (see below) |
 
@@ -441,7 +441,9 @@ ansible-playbook playbooks/deploy-radarr.yml
 # Run after deploy-prowlarr.yml and deploy-qbittorrent.yml
 ```
 
-### Jellyfin branding
+### Jellyfin
+
+Configure libraries, admin credentials, and server name under `jellyfin:` in `homelab.yaml` (see `homelab.example.yaml`). Plugin versions live in `vars/jellyfin_plugins.yml`.
 
 Custom CSS and the Live TV channel list layout deploy to `services/jellyfin/config/config/branding.xml` (gitignored):
 

@@ -7,6 +7,21 @@ core:
   domain: example.com
   acme_email: "admin@example.com"
 
+# --- Bind mount presets ---
+# Reference in service volumes: lists with *anchor or <<: *anchor
+x-mount-media1: &mount_media1
+  host: /mnt/media1
+  container: /media
+x-mount-media2: &mount_media2
+  host: /mnt/media2
+  container: /media2
+x-mount-downloads: &mount_downloads
+  host: /downloads
+  container: /downloads
+x-mount-audiobooks: &mount_audiobooks
+  host: /mnt/audiobooks
+  container: /audiobooks
+
 # --- Infrastructure ---
 socket_proxy:
   log_level: warning
@@ -37,16 +52,19 @@ socket_proxy:
   tasks: 1
   volumes: 1
   disable_ipv6: 0
+
 watchtower:
   cleanup: true
   poll_interval: 86400
   label_enable: true
+
 dozzle:
   level: info
   filter: "status=running"
   remote_host: "tcp://socket-proxy:2375"
   auth_provider: "forward-proxy"
   auth_header_user: "Remote-User"
+
 cloudflare:
   api_token: ''
   ddns_domains: ''
@@ -74,21 +92,8 @@ authelia:
         - admins
 
 # --- Monitoring & dashboard ---
-uptime_kuma:
-  bazarr_url: ''
-  sonarr_url: ''
-  radarr_url: ''
-  prowlarr_url: ''
-  dispatcharr_url: ''
 homepage:
   seerr_api_key: ''
-
-# --- Shared media paths ---
-media:
-  media1_dir: /mnt/media1
-  media2_dir: /mnt/media2
-  audiobooks_dir: /mnt/audiobooks
-  downloads_dir: /downloads
 
 # --- VPN & *arr stack ---
 gluetun:
@@ -109,10 +114,14 @@ gluetun:
     prowlarr: 9696
     bazarr: 6767
     qbittorrent_webui: 9865
+
 qbittorrent:
+  volumes:
+    - *mount_downloads
   webui_username: admin
   webui_password: ''
   lan_auth_bypass: true
+
 prowlarr:
   indexers:
     - name: Public Indexer
@@ -125,14 +134,12 @@ prowlarr:
       private: true
       username: ''
       password: ''
+
 sonarr:
   volumes:
-    - host: /mnt/media1
-      container: /media
-    - host: /mnt/media2
-      container: /media2
-    - host: /downloads
-      container: /downloads
+    - *mount_media1
+    - *mount_media2
+    - *mount_downloads
   root_folders:
     - /media/TV
   indexers:
@@ -172,14 +179,12 @@ sonarr:
         - WEBDL-1080p
         - WEBRip-1080p
         - Bluray-1080p
+
 radarr:
   volumes:
-    - host: /mnt/media1
-      container: /media
-    - host: /mnt/media2
-      container: /media2
-    - host: /downloads
-      container: /downloads
+    - *mount_media1
+    - *mount_media2
+    - *mount_downloads
   root_folders:
     - /media/Movies
   indexers:
@@ -221,10 +226,8 @@ radarr:
 
 bazarr:
   volumes:
-    - host: /mnt/media1
-      container: /media
-    - host: /mnt/media2
-      container: /media2
+    - *mount_media1
+    - *mount_media2
   auth: none
   sonarr:
     enabled: true
@@ -272,11 +275,54 @@ dispatcharr:
   m3u_refresh_interval: 24
   xc_password: ''
 
-# --- Apps ---
+# --- Media & streaming ---
+# Jellyfin at tv.<domain> — deploy dispatcharr before Live TV.
+jellyfin:
+  volumes:
+    - *mount_media1
+    - *mount_media2
+  server_name: Mikes Server
+  admin_username: admin
+  admin_password: ''
+  # SSO: Authelia client jellyfin, groups jellyfin-admin / jellyfin-user.
+  # Plugin versions: ansible/vars/jellyfin_plugins.yml
+  libraries:
+    - name: Movies
+      type: movies
+      paths:
+        - /media/Media/Movies
+        - /media2/Media/Movies
+    - name: Shows
+      type: tvshows
+      paths:
+        - /media/Media/TV Shows
+        - /media2/Media/TV Shows
+    - name: Sing and Sign
+      type: homevideos
+      paths:
+        - /media/Media/Programs/Sing and Sign
+    - name: Tractor Ted
+      type: homevideos
+      paths:
+        - /media/Media/Programs/Tractor Ted
+    - name: Les Mills
+      type: homevideos
+      paths:
+        - /media/Media/Programs/Les Mills
+
+jellyscope:
+  volumes:
+    - <<: *mount_media1
+      read_only: true
+    - <<: *mount_media2
+      read_only: true
+  admin_username: admin
+  admin_password: ''
+  secret_key: ''
+
 audiobookshelf:
   volumes:
-    - host: /mnt/audiobooks
-      container: /audiobooks
+    - *mount_audiobooks
   root_username: admin
   root_password: ''
   libraries:
@@ -288,14 +334,13 @@ audiobookshelf:
         disableWatcher: false
       folders:
         - /audiobooks/Books
+
+# --- Apps ---
 mealie:
   admin_username: admin
   admin_password: ''
   openai_api_key: ''
-jellyscope:
-  admin_username: admin
-  admin_password: ''
-  secret_key: ''
+
 memos:
   admin_username: admin
   admin_password: ''
@@ -305,6 +350,7 @@ memos:
 mcclean:
   admin_username: admin
   admin_password: ''
+
 sparkyfitness:
   db_password: ''
   app_db_password: ''

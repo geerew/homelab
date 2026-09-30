@@ -1,0 +1,38 @@
+---
+- name: Ensure Jellyfin plugin configuration directory exists
+  ansible.builtin.file:
+    path: "{{ jellyfin_plugins_config_dir }}"
+    state: directory
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0755"
+
+- name: Install Jellyfin plugins from configured repositories
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ playbook_dir }}/../scripts/bootstrap_jellyfin_plugins.py"
+  environment:
+    JELLYFIN_URL: "{{ jellyfin_base_url }}"
+    JELLYFIN_ADMIN_USERNAME: "{{ homelab_env.JELLYFIN_ADMIN_USERNAME }}"
+    JELLYFIN_ADMIN_PASSWORD: "{{ homelab_env.JELLYFIN_ADMIN_PASSWORD }}"
+    JELLYFIN_PLUGIN_REPOSITORIES: "{{ jellyfin_plugin_repositories | to_json }}"
+    JELLYFIN_PLUGINS: "{{ jellyfin_plugins | to_json }}"
+    JELLYFIN_PLUGINS_DIR: "{{ jellyfin_plugins_dir }}"
+  register: jellyfin_plugins_bootstrap
+  changed_when: "'nothing to change' not in jellyfin_plugins_bootstrap.stderr"
+  no_log: true
+  when: not ansible_check_mode
+
+- name: Render Jellyfin plugin configuration files
+  ansible.builtin.template:
+    src: "../templates/jellyfin/plugins/{{ item.config_template }}"
+    dest: "{{ jellyfin_plugins_config_dir }}/{{ item.config_dest }}"
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0644"
+  loop: "{{ jellyfin_plugins }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: item.manage_config | default(true) | bool
+  register: jellyfin_plugin_configs

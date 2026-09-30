@@ -1,0 +1,39 @@
+---
+jellyfin_plugin_repositories:
+  - name: Jellyfin Stable
+    url: https://repo.jellyfin.org/files/plugin/manifest.json
+  - name: Auth
+    url: https://raw.githubusercontent.com/9p4/jellyfin-plugin-sso/manifest-release/manifest.json
+  - name: Intro Skipper
+    url: https://intro-skipper.org/manifest.json
+
+jellyfin_plugins:
+  - name: Intro Skipper
+    guid: c83d86bb-a1e0-4c35-a113-e2101cf4ee6b
+    version: "12.0.4.0"
+    repository: https://intro-skipper.org/manifest.json
+    config_template: IntroSkipper.xml.j2
+    config_dest: IntroSkipper.xml
+  - name: SSO Authentication
+    guid: 505ce9d1-d916-42fa-86ca-673ef241d7df
+    version: "4.0.0.4"
+    repository: https://raw.githubusercontent.com/9p4/jellyfin-plugin-sso/manifest-release/manifest.json
+    config_template: SSO-Auth.xml.j2
+    config_dest: SSO-Auth.xml
+  - name: TheTVDB
+    guid: a677c0da-fac5-4cde-941a-7134223f14c8
+    version: "24.0.0.0"
+    repository: https://repo.jellyfin.org/files/plugin/manifest.json
+    config_template: Jellyfin.Plugin.Tvdb.xml.j2
+    config_dest: Jellyfin.Plugin.Tvdb.xml
+  - name: TMDb Box Sets
+    guid: bc4aad2e-d3d0-4725-a5e2-fd07949e5b42
+    version: "15.0.0.0"
+    repository: https://repo.jellyfin.org/files/plugin/manifest.json
+    config_template: Jellyfin.Plugin.TMDbBoxSets.xml.j2
+    config_dest: Jellyfin.Plugin.TMDbBoxSets.xml
+  - name: Trakt
+    guid: 4fe3201e-d6ae-4f2e-8917-e12bda571281
+    version: "33.0.0.0"
+    repository: https://repo.jellyfin.org/files/plugin/manifest.json
+    manage_config: false

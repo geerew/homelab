@@ -1,0 +1,16 @@
+---
+- name: Bootstrap Jellyfin from homelab.yaml
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ playbook_dir }}/../scripts/bootstrap_jellyfin.py"
+  environment:
+    JELLYFIN_URL: "{{ jellyfin_base_url }}"
+    JELLYFIN_ADMIN_USERNAME: "{{ homelab_env.JELLYFIN_ADMIN_USERNAME }}"
+    JELLYFIN_ADMIN_PASSWORD: "{{ homelab_env.JELLYFIN_ADMIN_PASSWORD }}"
+    JELLYFIN_SERVER_NAME: "{{ homelab_env.JELLYFIN_SERVER_NAME | default('') }}"
+    JELLYFIN_LIBRARIES: "{{ homelab_env.JELLYFIN_LIBRARIES }}"
+  register: jellyfin_bootstrap
+  changed_when: "'nothing to change' not in jellyfin_bootstrap.stderr"
+  no_log: true
+  when: not ansible_check_mode

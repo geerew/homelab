@@ -5,11 +5,22 @@
 
   vars:
     jellyfin_css_dir: "{{ playbook_dir }}/../files/jellyfin"
+    jellyfin_base_url: http://127.0.0.1:8096
+    jellyfin_config_dir: "{{ data_dir }}/services/jellyfin/config/config"
+    jellyfin_plugins_dir: "{{ data_dir }}/services/jellyfin/config/plugins"
+    jellyfin_plugins_config_dir: "{{ jellyfin_plugins_dir }}/configurations"
+    jellyfin_livetv_config_dir: "{{ jellyfin_config_dir }}"
     jellyfin_livetv_tuner_id: a1b2c3d4e5f6470890123456789abcde
     jellyfin_livetv_legacy_hdhr_tuner_id: cdaf3d789a214065a6f01b7f3067a340
     jellyfin_livetv_m3u_url: http://dispatcharr:9191/output/m3u/
     jellyfin_refresh_channels_task_id: 0c9ee3a88fc15547c6852205480da1fd
     jellyfin_api_key_app_name: ansible
+    jellyfin_oidc_client_id: jellyfin
+    jellyfin_sso_admin_role: jellyfin-admin
+    jellyfin_sso_user_role: jellyfin-user
+
+  vars_files:
+    - ../vars/jellyfin_plugins.yml
 
   pre_tasks:
     - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
@@ -19,11 +30,71 @@
     - name: Validate Jellyfin variables in homelab.yaml
       ansible.builtin.assert:
         that:
+          - homelab_config.jellyfin is defined
           - homelab_env.DOMAIN is defined
           - homelab_env.DOMAIN | length > 0
+          - homelab_env.OIDC_CLIENT_SECRET is defined
+          - homelab_env.OIDC_CLIENT_SECRET | length > 0
+          - homelab_env.JELLYFIN_LIBRARIES is defined
+          - homelab_env.JELLYFIN_LIBRARIES | from_json | length > 0
+          - homelab_env.JELLYFIN_ADMIN_USERNAME is defined
+          - homelab_env.JELLYFIN_ADMIN_USERNAME | length > 0
+          - homelab_env.JELLYFIN_ADMIN_PASSWORD is defined
+          - homelab_env.JELLYFIN_ADMIN_PASSWORD | length > 0
         fail_msg: >-
-          Set DOMAIN in {{ homelab_config_file }} (see homelab.example.yaml).
+          Set jellyfin.libraries, jellyfin.admin_*, authelia.oidc_client_secret, and DOMAIN in
+          {{ homelab_config_file }} (see homelab.example.yaml).
       when: not ansible_check_mode
+
+    - name: Ensure Jellyfin data directories exist
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/jellyfin/{{ item }}"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+      loop:
+        - config
+        - cache
+        - logs
+
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: jellyfin
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: jellyfin
+
+    - name: Wait for Jellyfin HTTP health
+      ansible.builtin.command:
+        argv:
+          - curl
+          - -fsS
+          - "{{ jellyfin_base_url }}/System/Info/Public"
+      register: jellyfin_health_wait
+      until: jellyfin_health_wait.rc == 0
+      retries: 36
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/bootstrap-jellyfin.yml
+
+    - ansible.builtin.import_tasks: ../tasks/apply-jellyfin-branding.yml
+      vars:
+        jellyfin_branding_config_dir: "{{ jellyfin_config_dir }}"
+        jellyfin_branding_hostname: tv
+
+    - ansible.builtin.import_tasks: ../tasks/apply-jellyfin-plugins.yml
+
+    - ansible.builtin.import_tasks: ../tasks/apply-jellyfin-encoding.yml
+      vars:
+        jellyfin_encoding_config_dir: "{{ jellyfin_config_dir }}"
+        jellyfin_vaapi_device: /dev/dri/renderD128
+
+    - ansible.builtin.import_tasks: ../tasks/apply-jellyfin-livetv-config.yml
 
     - ansible.builtin.import_tasks: ../tasks/ensure-jellyfin-api-key.yml
 
@@ -31,40 +102,6 @@
       ansible.builtin.set_fact:
         jellyfin_api_auth_header: 'MediaBrowser Token="{{ jellyfin_api_key }}"'
       when: not ansible_check_mode
-
-    - name: Ensure Jellyfin config directory exists
-      ansible.builtin.file:
-        path: "{{ data_dir }}/services/jellyfin/config/config"
-        state: directory
-        owner: "{{ homelab_env.PUID | default('1000') }}"
-        group: "{{ homelab_env.PGID | default('1000') }}"
-        mode: "0755"
-
-    - name: Render branding.xml from template
-      ansible.builtin.template:
-        src: ../templates/jellyfin/branding.xml.j2
-        dest: "{{ data_dir }}/services/jellyfin/config/config/branding.xml"
-        owner: "{{ homelab_env.PUID | default('1000') }}"
-        group: "{{ homelab_env.PGID | default('1000') }}"
-        mode: "0644"
-      register: jellyfin_branding_config
-
-    - name: Check for existing livetv.xml
-      ansible.builtin.stat:
-        path: "{{ data_dir }}/services/jellyfin/config/config/livetv.xml"
-      register: jellyfin_livetv_stat
-
-    # Bootstrap only — Jellyfin rewrites livetv.xml at runtime (e.g. AllowHWTranscoding).
-    # Ongoing tuner config is applied via the Live TV API tasks below.
-    - name: Render livetv.xml from template when missing
-      ansible.builtin.template:
-        src: ../templates/jellyfin/livetv.xml.j2
-        dest: "{{ data_dir }}/services/jellyfin/config/config/livetv.xml"
-        owner: "{{ homelab_env.PUID | default('1000') }}"
-        group: "{{ homelab_env.PGID | default('1000') }}"
-        mode: "0644"
-      register: jellyfin_livetv_config
-      when: not jellyfin_livetv_stat.stat.exists
 
     - name: Restart Jellyfin to pick up config changes
       community.docker.docker_container:
@@ -75,146 +112,37 @@
         - not ansible_check_mode
         - >-
           jellyfin_branding_config.changed
-          or (jellyfin_livetv_config is defined and jellyfin_livetv_config.changed)
+          or jellyfin_plugin_configs.changed
+          or (jellyfin_plugins_bootstrap is defined and jellyfin_plugins_bootstrap.changed)
+          or jellyfin_encoding_config.changed
+          or jellyfin_livetv_config.changed | default(false)
 
     - name: Wait for Jellyfin web UI after restart
       ansible.builtin.import_tasks: ../tasks/wait-for-http.yml
       vars:
-        wait_url: "http://127.0.0.1:8096/System/Info/Public"
+        wait_url: "{{ jellyfin_base_url }}/System/Info/Public"
       when:
         - not ansible_check_mode
         - >-
           jellyfin_branding_config.changed
-          or (jellyfin_livetv_config is defined and jellyfin_livetv_config.changed)
+          or jellyfin_plugin_configs.changed
+          or (jellyfin_plugins_bootstrap is defined and jellyfin_plugins_bootstrap.changed)
+          or jellyfin_encoding_config.changed
+          or jellyfin_livetv_config.changed | default(false)
 
-    - name: Remove legacy HDHomeRun tuner from Jellyfin
-      ansible.builtin.uri:
-        url: "http://127.0.0.1:8096/LiveTv/TunerHosts?id={{ jellyfin_livetv_legacy_hdhr_tuner_id }}"
-        method: DELETE
-        headers:
-          Authorization: "{{ jellyfin_api_auth_header }}"
-        status_code: [204, 404]
+    - ansible.builtin.import_tasks: ../tasks/apply-jellyfin-livetv-api.yml
       when: not ansible_check_mode
-
-    - name: Register Dispatcharr M3U tuner with Jellyfin
-      ansible.builtin.uri:
-        url: http://127.0.0.1:8096/LiveTv/TunerHosts
-        method: POST
-        headers:
-          Authorization: "{{ jellyfin_api_auth_header }}"
-        body_format: json
-        body:
-          Id: "{{ jellyfin_livetv_tuner_id }}"
-          Url: "{{ jellyfin_livetv_m3u_url }}"
-          Type: m3u
-          FriendlyName: Dispatcharr
-          EnableStreamLooping: true
-          TunerCount: 0
-          IgnoreDts: true
-          ReadAtNativeFramerate: true
-        status_code: 200
-      when: not ansible_check_mode
-
-    - name: Check Dispatcharr M3U output before Jellyfin channel re-import
-      ansible.builtin.uri:
-        url: http://127.0.0.1:9191/output/m3u/
-        return_content: true
-        status_code: 200
-      register: jellyfin_dispatcharr_m3u_check
-      when:
-        - not ansible_check_mode
-        - jellyfin_livetv_config.changed
-
-    - name: Set Jellyfin Live TV re-import flag
-      ansible.builtin.set_fact:
-        jellyfin_livetv_reimport: >-
-          {{ jellyfin_dispatcharr_m3u_check.content is search('#EXTINF') }}
-      when:
-        - not ansible_check_mode
-        - jellyfin_livetv_config.changed
-
-    - name: Warn when skipping Jellyfin channel re-import (Dispatcharr M3U empty)
-      ansible.builtin.debug:
-        msg: >-
-          Skipping Jellyfin Live TV channel wipe/re-import — Dispatcharr M3U at
-          {{ jellyfin_livetv_m3u_url }} has no channels. Run deploy-dispatcharr.yml
-          first, then re-run deploy-jellyfin.yml.
-      when:
-        - not ansible_check_mode
-        - jellyfin_livetv_config.changed
-        - not jellyfin_livetv_reimport | default(false)
-
-    - name: List Jellyfin Live TV channels before refresh
-      ansible.builtin.uri:
-        url: http://127.0.0.1:8096/Items?IncludeItemTypes=TvChannel&Recursive=true&Limit=500
-        headers:
-          Authorization: "{{ jellyfin_api_auth_header }}"
-        status_code: 200
-      register: jellyfin_livetv_channels_before
-      when:
-        - not ansible_check_mode
-        - jellyfin_livetv_reimport | default(false)
-
-    - name: Build Jellyfin Live TV channel delete list
-      ansible.builtin.set_fact:
-        jellyfin_livetv_channel_ids: >-
-          {{
-            jellyfin_livetv_channels_before.json.Items
-            | map(attribute='Id')
-            | list
-          }}
-      when:
-        - not ansible_check_mode
-        - jellyfin_livetv_reimport | default(false)
-
-    - name: Delete stale Jellyfin Live TV channels
-      ansible.builtin.uri:
-        url: "http://127.0.0.1:8096/Items?Ids={{ item | join(',') }}"
-        method: DELETE
-        headers:
-          Authorization: "{{ jellyfin_api_auth_header }}"
-        status_code: 204
-      loop: "{{ jellyfin_livetv_channel_ids | batch(50) | list }}"
-      loop_control:
-        label: "{{ item | length }} channel(s)"
-      when:
-        - not ansible_check_mode
-        - jellyfin_livetv_reimport | default(false)
-        - jellyfin_livetv_channel_ids | length > 0
-
-    - name: Refresh Jellyfin Live TV channels
-      ansible.builtin.uri:
-        url: "http://127.0.0.1:8096/ScheduledTasks/Running/{{ jellyfin_refresh_channels_task_id }}"
-        method: POST
-        headers:
-          Authorization: "{{ jellyfin_api_auth_header }}"
-        status_code: 204
-      when:
-        - not ansible_check_mode
-        - jellyfin_livetv_reimport | default(false)
-
-    - name: Wait for Jellyfin Live TV channel import
-      ansible.builtin.uri:
-        url: http://127.0.0.1:8096/LiveTv/Channels?Limit=1
-        headers:
-          Authorization: "{{ jellyfin_api_auth_header }}"
-        status_code: 200
-      register: jellyfin_livetv_channels_after
-      until: jellyfin_livetv_channels_after.json.TotalRecordCount | int > 0
-      retries: 12
-      delay: 5
-      when:
-        - not ansible_check_mode
-        - jellyfin_livetv_reimport | default(false)
 
     - name: Report Jellyfin deploy status
       ansible.builtin.debug:
         msg: >-
           {% if ansible_check_mode %}
-          Check mode: run without --check to render Jellyfin branding.xml and livetv.xml into
-          {{ data_dir }}/services/jellyfin/config/config/.
-          {% elif jellyfin_branding_config.changed or (jellyfin_livetv_config is defined and jellyfin_livetv_config.changed) %}
-          Deployed Jellyfin config{% if jellyfin_branding_config.changed %} (branding + CSS){% endif %}{% if jellyfin_livetv_config is defined and jellyfin_livetv_config.changed %} (M3U tuner → {{ jellyfin_livetv_m3u_url }}){% endif %} and restarted Jellyfin.{% if jellyfin_livetv_config is defined and jellyfin_livetv_config.changed %} Live TV channels re-imported from Dispatcharr with EPL / TNT / Sky section headers.{% endif %} Hard-refresh the browser after deploy.
+          Check mode: run without --check to deploy Jellyfin from {{ homelab_config_file }}.
+          {% elif jellyfin_bootstrap.changed | default(false) or jellyfin_branding_config.changed | default(false) or jellyfin_plugin_configs.changed | default(false) or jellyfin_plugins_bootstrap.changed | default(false) or jellyfin_encoding_config.changed | default(false) or jellyfin_livetv_config.changed | default(false) %}
+          Jellyfin configured at https://tv.{{ homelab_env.DOMAIN }}/ —
+          libraries, branding, plugins{% if jellyfin_livetv_config.changed | default(false) %}, and Live TV (Dispatcharr M3U){% endif %} applied from homelab.yaml.
+          {% if jellyfin_encoding_config.changed | default(false) %}VAAPI transcoding settings updated.{% endif %}
+          Hard-refresh the browser after deploy.
           {% else %}
-          Jellyfin config unchanged — no restart needed.
+          Jellyfin unchanged — already in sync with homelab.yaml.
           {% endif %}

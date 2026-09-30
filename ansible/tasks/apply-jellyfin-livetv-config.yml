@@ -1,0 +1,17 @@
+---
+- name: Check for existing livetv.xml
+  ansible.builtin.stat:
+    path: "{{ jellyfin_livetv_config_dir }}/livetv.xml"
+  register: jellyfin_livetv_stat
+
+# Bootstrap only — Jellyfin rewrites livetv.xml at runtime (e.g. AllowHWTranscoding).
+# Ongoing tuner config is applied via apply-jellyfin-livetv-api.yml after restart.
+- name: Render livetv.xml from template when missing
+  ansible.builtin.template:
+    src: ../templates/jellyfin/livetv.xml.j2
+    dest: "{{ jellyfin_livetv_config_dir }}/livetv.xml"
+    owner: "{{ homelab_env.PUID | default('1000') }}"
+    group: "{{ homelab_env.PGID | default('1000') }}"
+    mode: "0644"
+  register: jellyfin_livetv_config
+  when: not jellyfin_livetv_stat.stat.exists

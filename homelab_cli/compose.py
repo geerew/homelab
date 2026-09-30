@@ -19,25 +19,20 @@ def _render_service_volumes(cfg: dict[str, Any], service: str) -> str:
     for vol in volumes:
         host = vol.get("host", "")
         container = vol.get("container", "")
-        if host and container:
-            lines.append(f"      - {host}:{container}")
+        if not host or not container:
+            continue
+        mount = f"{host}:{container}"
+        if vol.get("read_only") or vol.get("ro"):
+            mount += ":ro"
+        lines.append(f"      - {mount}")
     return "\n".join(lines)
 
 
-def _audiobookshelf_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
-    return _render_service_volumes(cfg, "audiobookshelf")
+def _service_volumes_block(service: str) -> Callable[[dict[str, Any], dict[str, str]], str]:
+    def renderer(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
+        return _render_service_volumes(cfg, service)
 
-
-def _radarr_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
-    return _render_service_volumes(cfg, "radarr")
-
-
-def _sonarr_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
-    return _render_service_volumes(cfg, "sonarr")
-
-
-def _bazarr_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
-    return _render_service_volumes(cfg, "bazarr")
+    return renderer
 
 
 def _gluetun_api_key(_cfg: dict[str, Any], flat: dict[str, str]) -> str:
@@ -52,11 +47,18 @@ def _gluetun_api_key(_cfg: dict[str, Any], flat: dict[str, str]) -> str:
     return ""
 
 
+_VOLUME_SERVICES = (
+    "audiobookshelf",
+    "radarr",
+    "sonarr",
+    "bazarr",
+    "jellyfin",
+    "jellyscope",
+    "qbittorrent",
+)
+
 BLOCK_RENDERERS: dict[str, Callable[[dict[str, Any], dict[str, str]], str]] = {
-    "audiobookshelf_volumes": _audiobookshelf_volumes,
-    "radarr_volumes": _radarr_volumes,
-    "sonarr_volumes": _sonarr_volumes,
-    "bazarr_volumes": _bazarr_volumes,
+    **{f"{name}_volumes": _service_volumes_block(name) for name in _VOLUME_SERVICES},
     "gluetun_api_key": _gluetun_api_key,
 }
 
@@ -67,13 +69,13 @@ def _apply_kuma_defaults(flat: dict[str, str]) -> None:
     prowlarr = flat.get("PROWLARR_PORT", "9696")
     bazarr = flat.get("BAZARR_PORT", "6767")
     if not flat.get("KUMA_SONARR_URL"):
-        flat["KUMA_SONARR_URL"] = f"http://gluetun:{sonarr}/ping"
+        flat["KUMA_SONARR_URL"] = f"http://gluetun:{sonarr}"
     if not flat.get("KUMA_RADARR_URL"):
-        flat["KUMA_RADARR_URL"] = f"http://gluetun:{radarr}/ping"
+        flat["KUMA_RADARR_URL"] = f"http://gluetun:{radarr}"
     if not flat.get("KUMA_PROWLARR_URL"):
-        flat["KUMA_PROWLARR_URL"] = f"http://gluetun:{prowlarr}/ping"
+        flat["KUMA_PROWLARR_URL"] = f"http://gluetun:{prowlarr}"
     if not flat.get("KUMA_BAZARR_URL"):
-        flat["KUMA_BAZARR_URL"] = f"http://gluetun:{bazarr}/api/system/status"
+        flat["KUMA_BAZARR_URL"] = f"http://gluetun:{bazarr}"
     if not flat.get("KUMA_DISPATCHARR_URL"):
         flat["KUMA_DISPATCHARR_URL"] = "http://dispatcharr:9191"
 

@@ -75,7 +75,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Authelia** | `deploy-authelia.yml` | **Yes** — `users.yml` + `configuration.yml` templated; SQLite DB + notification log are auto-created at runtime (not Ansible todos) |
 | **Dispatcharr** | `deploy-dispatcharr.yml` | **Yes** — admin, M3U/XC provider, XC password, EPL/sports channel groups, auto channel sync |
 | **Gluetun** | `deploy-gluetun.yml` | **Yes** — VPN settings in `.env`, HTTP control-server auth in `config.toml`; ports/Traefik labels stay in Compose |
-| **Jellyfin** | `deploy-jellyfin.yml` | **No** — Live TV + branding/CSS only; libraries, users, OIDC, transcoding, plugins still manual |
+| **Jellyfin** | `deploy-jellyfin.yml` | **Yes** — libraries, plugins, SSO, VAAPI encoding, Live TV, branding/CSS; Trakt OAuth still manual |
 | **qBittorrent** | `deploy-qbittorrent.yml` | **Mostly for WebUI** — port + LAN auth bypass; BitTorrent session prefs intentionally left to UI on existing installs |
 | **Homepage** | `deploy-homepage.yml` | **Yes** — service list + widgets from `.env`; static YAML including `bookmarks.yaml` |
 
@@ -225,17 +225,16 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 ---
 
-### Jellyfin — 🟡
+### Jellyfin — ✅
 
 | | |
 | --- | --- |
 | **Playbook** | `playbooks/deploy-jellyfin.yml` |
 | **In `deploy-services.yml`** | Yes |
-| **Ansible sources** | `templates/jellyfin/branding.xml.j2`, `templates/jellyfin/livetv.xml.j2`, `files/jellyfin/custom.css`, `files/jellyfin/livetv-channels-list.css` |
-| **`.env` keys** | `DOMAIN` |
-| **Configured by Ansible** | Custom CSS (Intro Skipper styling, Authelia SSO button), Live TV M3U tuner → Dispatcharr, remove legacy HDHomeRun tuner, channel re-import on livetv.xml change; API key named `ansible` read from `jellyfin.db` or created automatically |
-| **Still outside Ansible** | Media libraries + folder paths, users, OIDC (`OIDC_CLIENT_SECRET`), transcoding/HW accel, plugins, server name, remote access, collections, most `system.xml` / `encoding.xml` |
-| **Next steps** | Template `system.xml` / network settings; API or templated library paths from `MEDIA1_DIR` / `MEDIA2_DIR`; OIDC provider block; Intro Skipper plugin config if file-based |
+| **Ansible sources** | `scripts/bootstrap_jellyfin.py`, `scripts/bootstrap_jellyfin_plugins.py`, `vars/jellyfin_plugins.yml`, `templates/jellyfin/` |
+| **`homelab.yaml` keys** | `jellyfin.libraries`, `jellyfin.admin_*`, `jellyfin.server_name`, `authelia.oidc_client_secret`, `DOMAIN` |
+| **Configured by Ansible** | Backs up `services/jellyfin/` before changes; libraries, server name, branding/CSS, plugins (Intro Skipper, SSO, TVDB, TMDb Box Sets, Trakt shell), VAAPI encoding, Live TV M3U → Dispatcharr, API key `ansible` |
+| **Still outside Ansible** | Trakt OAuth link, extra Jellyfin users beyond admin (SSO creates on login), Les Mills `homevideos` folder browse quirk |
 
 ---
 

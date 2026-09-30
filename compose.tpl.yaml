@@ -344,8 +344,7 @@ services:
       - {{ DATA_DIR }}/services/jellyfin/config:/config
       - {{ DATA_DIR }}/services/jellyfin/cache:/cache
       - {{ DATA_DIR }}/services/jellyfin/logs:/logs
-      - {{ MEDIA1_DIR }}:/media
-      - {{ MEDIA2_DIR }}:/media2
+{{BLOCK:jellyfin_volumes}}
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128
     labels:
@@ -384,8 +383,7 @@ services:
       - LC_ALL=en_US.UTF-8
     volumes:
       - {{ DATA_DIR }}/services/jellyscope/data:/app/data
-      - {{ MEDIA1_DIR }}:/media:ro
-      - {{ MEDIA2_DIR }}:/media2:ro
+{{BLOCK:jellyscope_volumes}}
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -736,7 +734,7 @@ services:
       - WEBUI_PORT={{ QBITTORRENT_WEBUI_PORT }}
     volumes:
       - {{ DATA_DIR }}/services/qbittorrent/config:/config
-      - {{ DOWNLOADS_DIR }}:/downloads
+{{BLOCK:qbittorrent_volumes}}
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:{{ QBITTORRENT_WEBUI_PORT }}/ >/dev/null || exit 1"]
@@ -776,7 +774,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma (override KUMA_SONARR_URL in .env if /ping not supported)
       - kuma.sonarr.http.name=Sonarr
-      - kuma.sonarr.http.url={{ KUMA_SONARR_URL }}/ping}
+      - kuma.sonarr.http.url={{ KUMA_SONARR_URL }}/ping
 
   radarr:
     image: lscr.io/linuxserver/radarr:latest
@@ -803,7 +801,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma
       - kuma.radarr.http.name=Radarr
-      - kuma.radarr.http.url={{ KUMA_RADARR_URL }}/ping}
+      - kuma.radarr.http.url={{ KUMA_RADARR_URL }}/ping
 
   prowlarr:
     image: ghcr.io/linuxserver/prowlarr:latest
@@ -829,7 +827,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma
       - kuma.prowlarr.http.name=Prowlarr
-      - kuma.prowlarr.http.url={{ KUMA_PROWLARR_URL }}/ping}
+      - kuma.prowlarr.http.url={{ KUMA_PROWLARR_URL }}/ping
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
@@ -856,7 +854,7 @@ services:
       - com.centurylinklabs.watchtower.enable=true
       # Kuma
       - kuma.bazarr.http.name=Bazarr
-      - kuma.bazarr.http.url={{ KUMA_BAZARR_URL }}/api/system/status}
+      - kuma.bazarr.http.url={{ KUMA_BAZARR_URL }}/
 
   dispatcharr:
     image: ghcr.io/dispatcharr/dispatcharr:latest
