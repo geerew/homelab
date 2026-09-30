@@ -13,6 +13,7 @@ from homelab_cli import backup as backup_mod
 from homelab_cli import deploy as deploy_mod
 from homelab_cli import docker as docker_mod
 from homelab_cli.registry import backupable_services, load_registry
+from homelab_cli import status as status_mod
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -77,6 +78,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="List services included in backup --all",
     )
 
+    status_p = sub.add_parser("status", help="Show container state and Gluetun sidecar health")
+    status_p.add_argument("services", nargs="*", metavar="SERVICE")
+    status_p.add_argument("--json", action="store_true", help="Print machine-readable JSON")
+
     return parser
 
 
@@ -134,6 +139,9 @@ def main(argv: list[str] | None = None) -> int:
                 verbose=args.verbose,
             )
             return 0
+
+        if args.command == "status":
+            return status_mod.run_status(args.services or None, json_output=args.json)
 
         if args.command == "backup":
             if args.list:

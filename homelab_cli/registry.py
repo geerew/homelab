@@ -28,6 +28,7 @@ DEPLOY_ORDER: list[str] = [
     "prowlarr",
     "sonarr",
     "radarr",
+    "bazarr",
     "jellyfin",
     "jellyscope",
     "homepage",

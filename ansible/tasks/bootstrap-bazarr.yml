@@ -1,0 +1,19 @@
+---
+- name: Bootstrap Bazarr settings from homelab.yaml
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ playbook_dir }}/../scripts/bootstrap_bazarr.py"
+  environment:
+    BAZARR_URL: "http://127.0.0.1:{{ homelab_env.BAZARR_PORT | default('6767') }}"
+    BAZARR_CONFIG_YAML: "{{ data_dir }}/services/bazarr/config/config/config.yaml"
+    BAZARR_DB: "{{ data_dir }}/services/bazarr/config/db/bazarr.db"
+    SONARR_CONFIG_XML: "{{ data_dir }}/services/sonarr/config/config.xml"
+    RADARR_CONFIG_XML: "{{ data_dir }}/services/radarr/config/config.xml"
+    SONARR_PORT: "{{ homelab_env.SONARR_PORT | default('8989') }}"
+    RADARR_PORT: "{{ homelab_env.RADARR_PORT | default('7878') }}"
+    BAZARR_SETTINGS: "{{ homelab_env.BAZARR_SETTINGS }}"
+  register: bazarr_bootstrap
+  changed_when: "'nothing to change' not in bazarr_bootstrap.stderr"
+  no_log: true
+  when: not ansible_check_mode

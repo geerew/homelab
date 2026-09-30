@@ -76,6 +76,9 @@
 - name: Deploy Radarr
   ansible.builtin.import_playbook: deploy-radarr.yml
 
+- name: Deploy Bazarr
+  ansible.builtin.import_playbook: deploy-bazarr.yml
+
 - name: Deploy Jellyfin
   ansible.builtin.import_playbook: deploy-jellyfin.yml
 

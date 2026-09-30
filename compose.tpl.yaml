@@ -37,6 +37,7 @@ services:
     dns:
       - 1.1.1.1
       - 8.8.8.8
+    # No Docker healthcheck: scratch image (/bin/ddns only); use Uptime Kuma push or logs instead.
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -88,6 +89,12 @@ services:
       - TASKS={{ SOCKET_PROXY_TASKS }}
       - VOLUMES={{ SOCKET_PROXY_VOLUMES }}
       - DISABLE_IPV6={{ SOCKET_PROXY_DISABLE_IPV6 }}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2375/_ping | grep -q OK || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -122,6 +129,12 @@ services:
       - {{ DATA_DIR }}/services/traefik/acme/acme.json:/acme.json
       - {{ DATA_DIR }}/services/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
       - {{ DATA_DIR }}/services/traefik/dynamic:/etc/traefik/dynamic:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ping | grep -q OK || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     labels:
       # Kuma
       - kuma.traefik.http.name=Traefik
@@ -197,6 +210,18 @@ services:
     networks:
       - traefik_network
       - socket_proxy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          "timeout 2 bash -c 'cat < /dev/null > /dev/tcp/uptime-kuma/3001' && timeout 2 bash -c 'cat < /dev/null > /dev/tcp/socket-proxy/2375'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -218,6 +243,12 @@ services:
       - DOZZLE_AUTH_PROVIDER={{ DOZZLE_AUTH_PROVIDER }}
       - DOZZLE_AUTH_HEADER_USER={{ DOZZLE_AUTH_HEADER_USER }}
       - TZ={{ TZ }}
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -469,6 +500,12 @@ services:
     volumes:
       - {{ DATA_DIR }}/services/memos:/var/opt/memos
       - {{ DATA_DIR }}/services/memos/secrets:/etc/secrets:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5230/healthz | grep -q 'Service ready' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -630,6 +667,7 @@ services:
       - {{ SONARR_PORT }}:{{ SONARR_PORT }}/tcp
       - {{ RADARR_PORT }}:{{ RADARR_PORT }}/tcp
       - {{ PROWLARR_PORT }}:{{ PROWLARR_PORT }}/tcp
+      - {{ BAZARR_PORT }}:{{ BAZARR_PORT }}/tcp
       - {{ QBITTORRENT_WEBUI_PORT }}:{{ QBITTORRENT_WEBUI_PORT }}/tcp
     networks:
       - traefik_network
@@ -700,6 +738,12 @@ services:
       - {{ DATA_DIR }}/services/qbittorrent/config:/config
       - {{ DOWNLOADS_DIR }}:/downloads
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:{{ QBITTORRENT_WEBUI_PORT }}/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -721,6 +765,12 @@ services:
     volumes:
       - {{ DATA_DIR }}/services/sonarr/config:/config
 {{BLOCK:sonarr_volumes}}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:{{ SONARR_PORT }}/ping >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -742,6 +792,12 @@ services:
     volumes:
       - {{ DATA_DIR }}/services/radarr/config:/config
 {{BLOCK:radarr_volumes}}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:{{ RADARR_PORT }}/ping >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -762,6 +818,12 @@ services:
       - TZ={{ TZ }}
     volumes:
       - {{ DATA_DIR }}/services/prowlarr/config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:{{ PROWLARR_PORT }}/ping >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -782,8 +844,13 @@ services:
       - TZ={{ TZ }}
     volumes:
       - {{ DATA_DIR }}/services/bazarr/config:/config
-      - {{ MEDIA1_DIR }}:/media
-      - {{ MEDIA2_DIR }}:/media2
+{{BLOCK:bazarr_volumes}}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:{{ BAZARR_PORT }}/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true
@@ -815,6 +882,12 @@ services:
       - {{ DATA_DIR }}/services/dispatcharr/data:/data
     devices:
       - /dev/dri/renderD128:/dev/dri/renderD128
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9191/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
     labels:
       # Watchtower
       - com.centurylinklabs.watchtower.enable=true

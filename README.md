@@ -44,6 +44,7 @@ cd ansible && ansible-galaxy collection install -r requirements.yml
 | --- | --- |
 | `./bin/homelab config validate` | Check required keys in `homelab.yaml` |
 | `./bin/homelab compose generate` | Render `compose.tpl.yaml` → `compose.yaml` |
+| `./bin/homelab status [service...]` | Container state, health, and Gluetun sidecar issues (exit 1 if any problems) |
 | `./bin/homelab up [service...]` | Generate + start (`up gluetun` → full VPN stack; `up prowlarr` → gluetun + prowlarr) |
 | `./bin/homelab down/stop [service...]` | Stop only the named service(s) |
 | `./bin/homelab start/restart [service...]` | Start/restart (`restart gluetun` → full VPN stack) |

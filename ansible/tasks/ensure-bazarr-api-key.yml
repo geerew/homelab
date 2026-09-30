@@ -1,0 +1,39 @@
+---
+- name: Check Bazarr config.yaml exists
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/bazarr/config/config/config.yaml"
+  register: bazarr_config_stat
+
+- name: Fail when Bazarr config is missing
+  ansible.builtin.fail:
+    msg: >-
+      {{ data_dir }}/services/bazarr/config/config/config.yaml not found.
+      Run deploy bazarr first — Homepage reads the API key from Bazarr's config.
+  when:
+    - not ansible_check_mode
+    - not bazarr_config_stat.stat.exists
+
+- name: Read Bazarr API key from config.yaml
+  ansible.builtin.slurp:
+    src: "{{ data_dir }}/services/bazarr/config/config/config.yaml"
+  register: bazarr_config_yaml
+  when: bazarr_config_stat.stat.exists | default(false)
+  no_log: true
+
+- name: Set Bazarr API key fact for Homepage
+  ansible.builtin.set_fact:
+    bazarr_api_key: "{{ (bazarr_config_yaml.content | b64decode | from_yaml).auth.apikey }}"
+  when:
+    - bazarr_config_yaml.content is defined
+    - ((bazarr_config_yaml.content | b64decode | from_yaml).auth.apikey | default('')) | length > 0
+  no_log: true
+
+- name: Fail when Bazarr API key is missing from config.yaml
+  ansible.builtin.fail:
+    msg: >-
+      No auth.apikey in {{ data_dir }}/services/bazarr/config/config/config.yaml.
+      Start Bazarr once before deploy-homepage.
+  when:
+    - not ansible_check_mode
+    - bazarr_config_stat.stat.exists
+    - bazarr_api_key | default('') | length == 0

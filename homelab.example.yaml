@@ -82,7 +82,6 @@ uptime_kuma:
   dispatcharr_url: ''
 homepage:
   seerr_api_key: ''
-  bazarr_api_key: ''
 
 # --- Shared media paths ---
 media:
@@ -219,6 +218,43 @@ radarr:
         - WEBDL-1080p
         - WEBRip-1080p
         - Bluray-1080p
+
+bazarr:
+  volumes:
+    - host: /mnt/media1
+      container: /media
+    - host: /mnt/media2
+      container: /media2
+  auth: none
+  sonarr:
+    enabled: true
+  radarr:
+    enabled: true
+  languages:
+    - en
+  language_profiles:
+    - name: English
+      tag: english
+      languages:
+        - en
+  defaults:
+    series_profile: English
+    movie_profile: English
+  providers:
+    enabled:
+      - yifysubtitles
+      - opensubtitlescom
+      - subdl
+    opensubtitlescom:
+      username: ''
+      password: ''
+      use_hash: true
+      include_ai_translated: false
+      include_machine_translated: false
+    subdl:
+      api_key: ''
+      ai_translate: false
+      include_ai_translated: false
 
 # --- IPTV ---
 dispatcharr:

@@ -1,0 +1,103 @@
+---
+- name: Deploy Bazarr
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Bazarr variables in homelab.yaml
+      ansible.builtin.assert:
+        that:
+          - homelab_config.bazarr.volumes is defined
+          - homelab_config.bazarr.volumes | length > 0
+          - homelab_config.bazarr.providers is defined
+          - homelab_config.bazarr.providers.enabled is defined
+          - homelab_config.bazarr.providers.enabled | length > 0
+        fail_msg: >-
+          Set bazarr.volumes and bazarr.providers in {{ homelab_config_file }}
+          (see homelab.example.yaml). Deploy sonarr and radarr first.
+      when: not ansible_check_mode
+
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: bazarr
+      when: not ansible_check_mode
+
+    - name: Ensure Bazarr config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/bazarr/config"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - name: Regenerate compose.yaml with current Bazarr volume mounts
+      ansible.builtin.command:
+        cmd: python3 bin/homelab compose generate
+        chdir: "{{ homelab_dir }}"
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: bazarr
+
+    - name: Wait for Bazarr config.yaml after first start
+      ansible.builtin.wait_for:
+        path: "{{ data_dir }}/services/bazarr/config/config/config.yaml"
+        timeout: 120
+      when: not ansible_check_mode
+
+    - name: Read Bazarr API key for health check
+      ansible.builtin.slurp:
+        src: "{{ data_dir }}/services/bazarr/config/config/config.yaml"
+      register: bazarr_config_yaml
+      no_log: true
+      when: not ansible_check_mode
+
+    - name: Set Bazarr API key for health check
+      ansible.builtin.set_fact:
+        bazarr_api_key: "{{ (bazarr_config_yaml.content | b64decode | from_yaml).auth.apikey }}"
+      when:
+        - not ansible_check_mode
+        - bazarr_config_yaml.content is defined
+      no_log: true
+
+    - name: Wait for Bazarr HTTP health
+      ansible.builtin.command:
+        argv:
+          - curl
+          - -fsS
+          - "http://127.0.0.1:{{ homelab_env.BAZARR_PORT | default('6767') }}/api/system/status"
+          - -H
+          - "X-Api-Key: {{ bazarr_api_key }}"
+      register: bazarr_health_wait
+      until: bazarr_health_wait.rc == 0
+      retries: 24
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/bootstrap-bazarr.yml
+
+    - name: Restart Bazarr after config changes
+      ansible.builtin.command:
+        cmd: docker compose restart bazarr
+        chdir: "{{ homelab_dir }}"
+      when:
+        - not ansible_check_mode
+        - bazarr_bootstrap.changed | default(false)
+
+    - name: Report Bazarr deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to deploy Bazarr from {{ homelab_config_file }}.
+          {% elif bazarr_bootstrap.changed | default(false) %}
+          Bazarr configured — settings applied from homelab.yaml.
+          {% else %}
+          Bazarr unchanged — settings already in sync with homelab.yaml.
+          {% endif %}

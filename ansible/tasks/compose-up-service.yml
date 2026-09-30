@@ -8,3 +8,6 @@
       - "{{ compose_service }}"
     state: present
   when: not ansible_check_mode
+
+- ansible.builtin.import_tasks: sync-gluetun-sidecars.yml
+  when: not ansible_check_mode

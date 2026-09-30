@@ -62,7 +62,8 @@ services:
     backup: true
     stack: gluetun_vpn
   bazarr:
-    deploy_playbook: null
+    deploy_playbook: deploy-bazarr.yml
+    backup: true
     stack: gluetun_vpn
   dispatcharr:
     deploy_playbook: deploy-dispatcharr.yml

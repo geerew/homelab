@@ -1,0 +1,13 @@
+---
+- name: "Wait for {{ dependency_name }} HTTP health"
+  ansible.builtin.command:
+    argv:
+      - curl
+      - -fsS
+      - "{{ dependency_url }}"
+  register: gluetun_dependency_health
+  until: gluetun_dependency_health.rc == 0
+  retries: 24
+  delay: 5
+  changed_when: false
+  when: not ansible_check_mode

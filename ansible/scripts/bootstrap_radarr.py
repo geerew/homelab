@@ -26,6 +26,7 @@ LIBRARY_IMPORT_LOOKUP_WORKERS = 5
 LIBRARY_IMPORT_ROOT_FOLDER_TIMEOUT = 600
 DEFAULT_LIBRARY_IMPORT_QUALITY_PROFILE = "Any"
 DEFAULT_LIBRARY_IMPORT_MONITOR = "none"
+DEFAULT_QBITTORRENT_PORT = 9865
 QUALITY_DEFINITION_TIERS: dict[str, list[str]] = {
     "720p": ["HDTV-720p", "WEBDL-720p", "WEBRip-720p", "Bluray-720p"],
     "1080p": ["HDTV-1080p", "WEBDL-1080p", "WEBRip-1080p", "Bluray-1080p"],
@@ -34,6 +35,10 @@ QUALITY_DEFINITION_TIERS: dict[str, list[str]] = {
 
 def log(msg: str) -> None:
     print(f"radarr bootstrap: {msg}", file=sys.stderr)
+
+
+def qbittorrent_port() -> int:
+    return int(os.environ.get("QBITTORRENT_WEBUI_PORT", str(DEFAULT_QBITTORRENT_PORT)))
 
 
 def snake_to_camel(name: str) -> str:
@@ -285,7 +290,7 @@ def normalize_download_client_entry(entry: str | dict[str, Any]) -> dict[str, An
     if not isinstance(entry, dict):
         raise RuntimeError(f"invalid download client entry: {entry!r}")
 
-    qb_port = int(os.environ.get("QBITTORRENT_WEBUI_PORT", "8080"))
+    qb_port = qbittorrent_port()
     return {
         "name": entry.get("name", "qBittorrent"),
         "implementation": entry.get("implementation", "QBittorrent"),
@@ -479,7 +484,7 @@ def download_client_needs_update(
 
     field_checks = {
         "host": desired.get("host", "localhost"),
-        "port": desired.get("port", 8080),
+        "port": desired.get("port", qbittorrent_port()),
         "useSsl": desired.get("use_ssl", False),
         "movieCategory": desired.get("movie_category", "radarr"),
         "username": username,
@@ -538,7 +543,7 @@ def ensure_download_clients(
 
         fields = payload.get("fields", [])
         set_field_value(fields, "host", desired.get("host", "localhost"))
-        set_field_value(fields, "port", desired.get("port", 8080))
+        set_field_value(fields, "port", desired.get("port", qbittorrent_port()))
         set_field_value(fields, "useSsl", desired.get("use_ssl", False))
         if username:
             set_field_value(fields, "username", username)

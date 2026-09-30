@@ -124,7 +124,7 @@
         widget:
           type: bazarr
           url: http://gluetun:{{ homelab_env.BAZARR_PORT | default('6767') }}
-          key: {{ homelab_env.HOMEPAGE_BAZARR_API_KEY }}
+          key: {{ bazarr_api_key }}
 
     - Dispatcharr:
         icon: dispatcharr

@@ -76,6 +76,16 @@
       changed_when: false
       when: not ansible_check_mode
 
+    - ansible.builtin.import_tasks: ../tasks/wait-for-gluetun-dependency.yml
+      vars:
+        dependency_name: Prowlarr
+        dependency_url: "http://127.0.0.1:{{ homelab_env.PROWLARR_PORT | default('9696') }}/ping"
+
+    - ansible.builtin.import_tasks: ../tasks/wait-for-gluetun-dependency.yml
+      vars:
+        dependency_name: qBittorrent
+        dependency_url: "http://127.0.0.1:{{ homelab_env.QBITTORRENT_WEBUI_PORT | default('9865') }}/api/v2/app/version"
+
     - ansible.builtin.import_tasks: ../tasks/bootstrap-sonarr.yml
 
     - name: Report Sonarr deploy status

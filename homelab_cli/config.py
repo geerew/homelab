@@ -269,6 +269,7 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
     prowlarr = cfg.get("prowlarr", {})
     sonarr = cfg.get("sonarr", {})
     radarr = cfg.get("radarr", {})
+    bazarr = cfg.get("bazarr", {})
     media = cfg.get("media", {})
     abs_cfg = cfg.get("audiobookshelf", {})
     kuma = cfg.get("uptime_kuma", {})
@@ -331,6 +332,18 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
             "quality_profile": library_import.get("quality_profile", ""),
             "minimum_availability": library_import.get("minimum_availability", "released"),
             "monitor": library_import.get("monitor", "none"),
+        }
+    )
+
+    bazarr_settings_json = json.dumps(
+        {
+            "auth": bazarr.get("auth", "none"),
+            "sonarr": bazarr.get("sonarr", {}),
+            "radarr": bazarr.get("radarr", {}),
+            "languages": bazarr.get("languages", []),
+            "language_profiles": bazarr.get("language_profiles", []),
+            "defaults": bazarr.get("defaults", {}),
+            "providers": bazarr.get("providers", {}),
         }
     )
 
@@ -469,6 +482,7 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "SONARR_QUALITY_PROFILES": sonarr_quality_profiles_json,
         "SONARR_QUALITY_DEFINITIONS": sonarr_quality_definitions_json,
         "SONARR_LIBRARY_IMPORT": sonarr_library_import_json,
+        "BAZARR_SETTINGS": bazarr_settings_json,
         "HOMEPAGE_SEERR_API_KEY": str(hp.get("seerr_api_key", "")),
         "HOMEPAGE_BAZARR_API_KEY": str(hp.get("bazarr_api_key", "")),
         "MCCLEAN_ADMIN_USERNAME": str(mc.get("admin_username", "admin")),

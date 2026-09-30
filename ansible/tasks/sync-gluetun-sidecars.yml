@@ -1,0 +1,8 @@
+---
+- name: Recreate Gluetun sidecars attached to a stale network namespace
+  ansible.builtin.command:
+    cmd: python3 -c "from homelab_cli.docker import sync_gluetun_sidecars; sync_gluetun_sidecars()"
+    chdir: "{{ homelab_dir }}"
+  register: gluetun_sidecar_sync
+  changed_when: gluetun_sidecar_sync.stdout | length > 0
+  when: not ansible_check_mode

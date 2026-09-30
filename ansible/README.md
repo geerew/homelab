@@ -44,6 +44,7 @@ export HOMELAB_DIR=/home/mike/Documents/homelab
 | `playbooks/deploy-prowlarr.yml` | Prowlarr external auth (hardcoded) + Cardigann indexers from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-sonarr.yml` | Sonarr volumes, root folders, Prowlarr indexers, qBittorrent, profiles from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-radarr.yml` | Radarr volumes, root folders, Prowlarr indexers, qBittorrent, profiles from `homelab.yaml`; backs up full service dir |
+| `playbooks/deploy-bazarr.yml` | Bazarr volumes, Sonarr/Radarr links, languages, providers from `homelab.yaml`; backs up full service dir |
 | `playbooks/deploy-homepage.yml` | Deploy Homepage config from Ansible templates + `.env` |
 | `playbooks/deploy-jellyfin.yml` | Deploy Jellyfin config (branding, CSS, M3U tuner, Live TV list layout) |
 | `playbooks/deploy-jellyscope.yml` | Bootstrap Jellyscope admin + ensure Jellyfin API key; sync connection settings |
@@ -101,6 +102,9 @@ ansible-playbook playbooks/deploy-sonarr.yml
 # Deploy Radarr (paths, indexers, download client, profiles from homelab.yaml)
 ansible-playbook playbooks/deploy-radarr.yml
 
+# Deploy Bazarr (Sonarr/Radarr links, languages, providers from homelab.yaml)
+ansible-playbook playbooks/deploy-bazarr.yml
+
 # Deploy Homepage config (widget creds/keys from .env)
 ansible-playbook playbooks/deploy-homepage.yml
 
@@ -132,8 +136,9 @@ Run `site.yml` before any deploy playbook — Socket Proxy must be up before Tra
 | 12 | `deploy-prowlarr.yml` | Gluetun + Prowlarr on `:9696` |
 | 13 | `deploy-sonarr.yml` | Gluetun + Prowlarr indexers; qBittorrent creds from yaml |
 | 14 | `deploy-radarr.yml` | Gluetun + Prowlarr indexers; qBittorrent creds from yaml |
-| 14 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
-| 15 | `deploy-homepage.yml` | — (last) |
+| 15 | `deploy-bazarr.yml` | Sonarr + Radarr API keys from config.xml |
+| 16 | `deploy-jellyfin.yml` | Dispatcharr M3U export |
+| 17 | `deploy-homepage.yml` | — (last) |
 
 Use `deploy-services.yml` to run steps 1–13 in this order automatically.
 
@@ -225,7 +230,7 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Prowlarr | Auto — API key from `services/prowlarr/config/config.xml` (run `deploy prowlarr` first) |
 | Sonarr | Auto — API key from `services/sonarr/config/config.xml` (run `deploy sonarr` first) |
 | Radarr | Auto — API key from `services/radarr/config/config.xml` (run `deploy radarr` first) |
-| Bazarr | `HOMEPAGE_BAZARR_API_KEY` |
+| Bazarr | Auto — API key from `services/bazarr/config/config/config.yaml` (run `deploy bazarr` first) |
 | Seerr | `HOMEPAGE_SEERR_API_KEY` |
 | Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
 | Dispatcharr | `DISPATCHARR_ADMIN_*` |

@@ -36,6 +36,10 @@ def _sonarr_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
     return _render_service_volumes(cfg, "sonarr")
 
 
+def _bazarr_volumes(cfg: dict[str, Any], _flat: dict[str, str]) -> str:
+    return _render_service_volumes(cfg, "bazarr")
+
+
 def _gluetun_api_key(_cfg: dict[str, Any], flat: dict[str, str]) -> str:
     key = flat.get("GLUETUN_API_KEY", "")
     if key:
@@ -52,6 +56,7 @@ BLOCK_RENDERERS: dict[str, Callable[[dict[str, Any], dict[str, str]], str]] = {
     "audiobookshelf_volumes": _audiobookshelf_volumes,
     "radarr_volumes": _radarr_volumes,
     "sonarr_volumes": _sonarr_volumes,
+    "bazarr_volumes": _bazarr_volumes,
     "gluetun_api_key": _gluetun_api_key,
 }
 
