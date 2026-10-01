@@ -13,6 +13,7 @@ from homelab_cli import backup as backup_mod
 from homelab_cli import deploy as deploy_mod
 from homelab_cli import docker as docker_mod
 from homelab_cli.registry import backupable_services, load_registry
+from homelab_cli import restore as restore_mod
 from homelab_cli import status as status_mod
 
 
@@ -76,6 +77,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--list",
         action="store_true",
         help="List services included in backup --all",
+    )
+
+    restore_p = sub.add_parser("restore", help="Restore a service from backups/<service>/<id>/")
+    restore_p.add_argument("service", metavar="SERVICE")
+    restore_p.add_argument(
+        "backup_id",
+        nargs="?",
+        metavar="BACKUP_ID",
+        help="Backup folder name (e.g. manual-20260930T184530Z) or absolute path",
+    )
+    restore_p.add_argument(
+        "--list",
+        action="store_true",
+        help="List available backups for the service",
+    )
+    restore_p.add_argument(
+        "--yes",
+        action="store_true",
+        help="Confirm destructive restore (overwrites live data)",
     )
 
     status_p = sub.add_parser("status", help="Show container state and Gluetun sidecar health")
@@ -163,10 +183,44 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
+        if args.command == "restore":
+            if args.list:
+                from homelab_cli.config import load_config, resolve_data_dir
+                from homelab_cli.paths import config_file, repo_root
+
+                data_dir = resolve_data_dir(load_config(config_file(repo_root())))
+                backups = restore_mod.list_backups(args.service, data_dir)
+                if backups:
+                    print(f"Backups for {args.service}:")
+                    for path in backups:
+                        try:
+                            rel = path.relative_to(data_dir)
+                        except ValueError:
+                            rel = path
+                        print(f"  {path.name}  ({rel})")
+                else:
+                    print(f"No backups found for {args.service}")
+                return 0
+            if not args.backup_id:
+                print("Specify BACKUP_ID or --list", file=sys.stderr)
+                return 1
+            if not args.yes:
+                print(
+                    f"Restore overwrites live {args.service} data. Re-run with --yes to confirm.",
+                    file=sys.stderr,
+                )
+                return 1
+            restore_mod.run_restore(args.service, args.backup_id)
+            print(f"Restored {args.service} from {args.backup_id}")
+            return 0
+
     except ConfigError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     except backup_mod.BackupError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except restore_mod.RestoreError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     except subprocess.CalledProcessError as exc:

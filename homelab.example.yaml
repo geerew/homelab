@@ -90,6 +90,7 @@ authelia:
       password: changeme
       groups:
         - admins
+        - paperless-admin
 
 # --- Monitoring & dashboard ---
 homepage:
@@ -345,6 +346,14 @@ memos:
   admin_username: admin
   admin_password: ''
   admin_email: ''
+
+paperless:
+  admin_username: admin   # break-glass local admin; created once on first deploy
+  admin_password: ''
+  db_password: ''
+  ocr_language: eng
+  oidc_superuser_group: paperless-admin  # Authelia group → Paperless superuser
+  # oidc_staff_group: paperless-staff    # optional: Authelia group → Paperless staff (not superuser)
 
 # --- Other ---
 mcclean:

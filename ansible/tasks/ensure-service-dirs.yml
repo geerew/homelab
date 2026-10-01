@@ -44,6 +44,11 @@
     - mealie/data
     - memos
     - memos/secrets
+    - paperless/data
+    - paperless/media
+    - paperless/export
+    - paperless/consume
+    - paperless/db
     - sparkyfitness/db
     - sparkyfitness/backup
     - sparkyfitness/uploads

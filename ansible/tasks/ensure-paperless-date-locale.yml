@@ -1,0 +1,34 @@
+---
+# UK date display (dd/mm/yyyy) for all Paperless users; server-side parsing via compose env.
+- name: Ensure Paperless users use UK date locale in UI settings
+  ansible.builtin.command:
+    argv:
+      - docker
+      - exec
+      - paperless
+      - python3
+      - manage.py
+      - shell
+      - -c
+      - |
+        from django.contrib.auth import get_user_model
+        from documents.models import UiSettings
+
+        DATE_LOCALE = "en-gb"
+
+        for user in get_user_model().objects.all():
+            ui, _ = UiSettings.objects.get_or_create(user=user, defaults={"settings": {}})
+            settings = dict(ui.settings or {})
+            general = dict(settings.get("general_settings") or {})
+            date_display = dict(general.get("date_display") or {})
+            if date_display.get("date_locale") == DATE_LOCALE:
+                continue
+            date_display["date_locale"] = DATE_LOCALE
+            general["date_display"] = date_display
+            settings["general_settings"] = general
+            ui.settings = settings
+            ui.save(update_fields=["settings"])
+            print(f"updated:{user.username}")
+  register: paperless_date_locale
+  changed_when: paperless_date_locale.stdout | length > 0
+  when: not ansible_check_mode

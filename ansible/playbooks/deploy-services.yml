@@ -58,6 +58,9 @@
 - name: Deploy Mealie
   ansible.builtin.import_playbook: deploy-mealie.yml
 
+- name: Deploy Paperless
+  ansible.builtin.import_playbook: deploy-paperless.yml
+
 - name: Deploy Gluetun
   ansible.builtin.import_playbook: deploy-gluetun.yml
 

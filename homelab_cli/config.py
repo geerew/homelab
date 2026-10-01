@@ -160,6 +160,14 @@ def env_to_config(env: dict[str, str], users: dict[str, Any] | None = None, jwks
             "admin_email": env.get("MEALIE_ADMIN_EMAIL", ""),
             "openai_api_key": env.get("MEALIE_OPENAI_API_KEY", ""),
         },
+        "paperless": {
+            "admin_username": env.get("PAPERLESS_ADMIN_USERNAME", "admin"),
+            "admin_password": env.get("PAPERLESS_ADMIN_PASSWORD", ""),
+            "db_password": env.get("PAPERLESS_DB_PASSWORD", ""),
+            "ocr_language": env.get("PAPERLESS_OCR_LANGUAGE", "eng"),
+            "oidc_superuser_group": env.get("PAPERLESS_OIDC_SUPERUSER_GROUP", "paperless-admin"),
+            "oidc_staff_group": env.get("PAPERLESS_OIDC_STAFF_GROUP", ""),
+        },
         "gluetun": {
             "api_key": env.get("GLUETUN_API_KEY", ""),
             "vpn_service_provider": env.get("VPN_SERVICE_PROVIDER", "mullvad"),
@@ -262,6 +270,7 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
     memos = cfg.get("memos", {})
     sf = cfg.get("sparkyfitness", {})
     mealie = cfg.get("mealie", {})
+    paperless = cfg.get("paperless", {})
     gl = cfg.get("gluetun", {})
     gl_ports = gl.get("ports", {})
     qb = cfg.get("qbittorrent", {})
@@ -333,6 +342,37 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
             "monitor": library_import.get("monitor", "none"),
         }
     )
+
+    domain = str(core.get("domain", ""))
+    oidc_secret = str(au.get("oidc_client_secret", ""))
+    paperless_socialaccount_providers = ""
+    if domain and oidc_secret:
+        paperless_socialaccount_providers = json.dumps(
+            {
+                "openid_connect": {
+                    "SCOPE": ["openid", "profile", "email", "groups"],
+                    "OAUTH_PKCE_ENABLED": True,
+                    "APPS": [
+                        {
+                            "provider_id": "authelia",
+                            "name": "Authelia",
+                            "client_id": "paperless",
+                            "secret": oidc_secret,
+                            "settings": {
+                                "server_url": f"https://auth.{domain}",
+                                "token_auth_method": "client_secret_basic",
+                            },
+                        }
+                    ],
+                }
+            }
+        )
+
+    data_dir = Path(str(core.get("data_dir", ".")))
+    paperless_secret_key = ""
+    secret_key_file = data_dir / "services" / "paperless" / "secret_key"
+    if secret_key_file.is_file():
+        paperless_secret_key = secret_key_file.read_text(encoding="utf-8").strip()
 
     bazarr_settings_json = json.dumps(
         {
@@ -437,6 +477,16 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "MEALIE_ADMIN_PASSWORD": str(mealie.get("admin_password", "")),
         "MEALIE_ADMIN_EMAIL": str(mealie.get("admin_email", "")),
         "MEALIE_OPENAI_API_KEY": str(mealie.get("openai_api_key", "")),
+        "PAPERLESS_ADMIN_USERNAME": str(paperless.get("admin_username", "admin")),
+        "PAPERLESS_ADMIN_PASSWORD": str(paperless.get("admin_password", "")),
+        "PAPERLESS_DB_PASSWORD": str(paperless.get("db_password", "")),
+        "PAPERLESS_SECRET_KEY": paperless_secret_key,
+        "PAPERLESS_OCR_LANGUAGE": str(paperless.get("ocr_language", "eng")),
+        "PAPERLESS_SOCIALACCOUNT_PROVIDERS": paperless_socialaccount_providers,
+        "PAPERLESS_OIDC_SUPERUSER_GROUP": str(
+            paperless.get("oidc_superuser_group", "paperless-admin")
+        ),
+        "PAPERLESS_OIDC_STAFF_GROUP": str(paperless.get("oidc_staff_group", "")),
         "GLUETUN_API_KEY": str(gl.get("api_key", "")),
         "VPN_SERVICE_PROVIDER": str(gl.get("vpn_service_provider", "")),
         "VPN_TYPE": str(gl.get("vpn_type", "")),

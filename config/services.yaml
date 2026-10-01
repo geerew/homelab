@@ -36,6 +36,20 @@ services:
   memos:
     deploy_playbook: deploy-memos.yml
     backup: true
+  paperless-broker:
+    deploy_playbook: null
+    stack: paperless
+  paperless-db:
+    deploy_playbook: null
+    stack: paperless
+  paperless:
+    deploy_playbook: deploy-paperless.yml
+    backup: true
+    backup_strategy: paperless
+    backup_exclude:
+      - db
+      - redis
+    stack: paperless
   sparkyfitness-db:
     deploy_playbook: null
   sparkyfitness-server:
@@ -70,6 +84,10 @@ services:
     deploy_playbook: deploy-dispatcharr.yml
 
 stacks:
+  paperless:
+    - paperless-broker
+    - paperless-db
+    - paperless
   gluetun_vpn:
     - gluetun
     - qbittorrent

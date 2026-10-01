@@ -22,6 +22,7 @@ DEPLOY_ORDER: list[str] = [
     "memos",
     "audiobookshelf",
     "mealie",
+    "paperless",
     "gluetun",
     "dispatcharr",
     "qbittorrent",

@@ -492,24 +492,34 @@ ansible-playbook playbooks/site.yml --check --diff
 ansible-playbook playbooks/deploy-authelia.yml --check --diff
 ```
 
-### Service backups (Mealie, Audiobookshelf, Jellyscope, Memos)
+### Service backups (Mealie, Audiobookshelf, Jellyscope, Memos, Paperless)
 
 Manual backups:
 
 ```bash
 ./bin/homelab backup mealie --label manual
+./bin/homelab backup paperless --label manual
 ./bin/homelab backup --all
 ./bin/homelab backup --list   # services included in --all
 ```
 
 Before deploy changes, Ansible runs the same CLI (`homelab backup <name> --label deploy`). Each backup copies the full live tree at `services/<name>/` to `backups/<name>/<label>-<timestamp>/` (same layout — e.g. Mealie includes `data/`, `homepage_api_key`, etc.). Add `backup: true` to a service in [`config/services.yaml`](../config/services.yaml) to include it in `backup --all`.
 
-To restore:
+**Paperless** uses `backup_strategy: paperless` — files under `services/paperless/` (excluding container-owned `db/` and `redis/`) plus a **`postgres.dump`** (`pg_dump -Fc` from `paperless-db`). Redis/Valkey is ephemeral (task queue) and is not backed up.
+
+To restore folder-based services (Mealie, etc.):
 
 ```bash
 docker stop mealie   # or the relevant container
 rsync -a --delete backups/mealie/<timestamp>/ services/mealie/
 docker start mealie
+```
+
+To restore Paperless (files + PostgreSQL):
+
+```bash
+./bin/homelab restore paperless --list
+./bin/homelab restore paperless <timestamp> --yes
 ```
 
 Backups and Docker/API bootstrap steps are skipped in check mode. Template and `file` tasks (e.g. Authelia config, Homepage YAML, service data dirs) still run with `--diff` so you can preview changes even on a fresh install with no backup dir yet.

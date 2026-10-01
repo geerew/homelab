@@ -1,0 +1,142 @@
+---
+- name: Deploy Paperless-ngx
+  hosts: localhost
+  gather_facts: false
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Paperless variables in homelab.yaml
+      ansible.builtin.assert:
+        that:
+          - homelab_config.paperless is defined
+          - homelab_env.DOMAIN is defined
+          - homelab_env.DOMAIN | length > 0
+          - homelab_env.OIDC_CLIENT_SECRET is defined
+          - homelab_env.OIDC_CLIENT_SECRET | length > 0
+          - homelab_env.PAPERLESS_ADMIN_USERNAME is defined
+          - homelab_env.PAPERLESS_ADMIN_USERNAME | length > 0
+          - homelab_env.PAPERLESS_ADMIN_PASSWORD is defined
+          - homelab_env.PAPERLESS_ADMIN_PASSWORD | length > 0
+          - homelab_env.PAPERLESS_DB_PASSWORD is defined
+          - homelab_env.PAPERLESS_DB_PASSWORD | length > 0
+          - homelab_env.PAPERLESS_SOCIALACCOUNT_PROVIDERS is defined
+          - homelab_env.PAPERLESS_SOCIALACCOUNT_PROVIDERS | length > 0
+        fail_msg: >-
+          Set paperless.admin_*, paperless.db_password, authelia.oidc_client_secret, and DOMAIN in
+          {{ homelab_config_file }} (see homelab.example.yaml).
+      when: not ansible_check_mode
+
+    - name: Ensure Paperless data directories exist
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/paperless/{{ item }}"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+      loop:
+        - data
+        - media
+        - export
+        - consume
+        - db
+
+    - ansible.builtin.import_tasks: ../tasks/ensure-paperless-secret-key.yml
+
+    - name: Load Paperless secret key for compose.env
+      ansible.builtin.slurp:
+        src: "{{ data_dir }}/services/paperless/secret_key"
+      register: paperless_secret_key_slurp
+      when: not ansible_check_mode
+
+    - name: Set Paperless secret key fact
+      ansible.builtin.set_fact:
+        paperless_secret_key: "{{ paperless_secret_key_slurp.content | b64decode | trim }}"
+      when: not ansible_check_mode
+      no_log: true
+
+    - name: Render Paperless compose.env (secrets + OIDC)
+      ansible.builtin.template:
+        src: ../templates/paperless/compose.env.j2
+        dest: "{{ data_dir }}/services/paperless/compose.env"
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0600"
+      register: paperless_compose_env
+      no_log: true
+      when: not ansible_check_mode
+
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: paperless
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/ensure-compose-generated.yml
+
+    - name: Apply Paperless stack container configuration
+      community.docker.docker_compose_v2:
+        project_src: "{{ homelab_dir }}"
+        services:
+          - paperless-broker
+          - paperless-db
+          - paperless
+        state: present
+      when: not ansible_check_mode
+
+    - name: Restart Paperless to pick up OIDC env changes
+      community.docker.docker_container:
+        name: paperless
+        state: started
+        restart: true
+      when:
+        - not ansible_check_mode
+        - paperless_compose_env.changed
+
+    - name: Clear break-glass admin email so OIDC users are not blocked
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - paperless
+          - python3
+          - manage.py
+          - shell
+          - -c
+          - |
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            user = User.objects.filter(username="{{ homelab_env.PAPERLESS_ADMIN_USERNAME }}").first()
+            if user and user.email:
+                user.email = ""
+                user.save(update_fields=["email"])
+                print("cleared")
+      register: paperless_admin_email_clear
+      changed_when: "'cleared' in paperless_admin_email_clear.stdout"
+      when: not ansible_check_mode
+
+    - name: Wait for Paperless HTTP health
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - paperless
+          - curl
+          - -fsS
+          - http://127.0.0.1:8000/
+      register: paperless_health_wait
+      until: paperless_health_wait.rc == 0
+      retries: 48
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/ensure-paperless-date-locale.yml
+
+    - name: Report Paperless deploy status
+      ansible.builtin.debug:
+        msg: >-
+          Paperless at https://paperless.{{ homelab_env.DOMAIN }}/ —
+          Authelia OIDC enabled (superuser group: {{ homelab_env.PAPERLESS_OIDC_SUPERUSER_GROUP }}).
+          UK dates: DMY parsing + en-gb UI locale for all users.
