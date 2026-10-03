@@ -1,0 +1,39 @@
+---
+- name: Check Seerr settings.json exists
+  ansible.builtin.stat:
+    path: "{{ data_dir }}/services/seerr/config/settings.json"
+  register: seerr_settings_stat
+
+- name: Fail when Seerr settings are missing
+  ansible.builtin.fail:
+    msg: >-
+      {{ data_dir }}/services/seerr/config/settings.json not found.
+      Run deploy seerr first — Homepage reads the API key from Seerr's settings.
+  when:
+    - not ansible_check_mode
+    - not seerr_settings_stat.stat.exists
+
+- name: Read Seerr API key from settings.json
+  ansible.builtin.slurp:
+    src: "{{ data_dir }}/services/seerr/config/settings.json"
+  register: seerr_settings_slurp
+  when: seerr_settings_stat.stat.exists | default(false)
+  no_log: true
+
+- name: Set Seerr API key fact for Homepage
+  ansible.builtin.set_fact:
+    seerr_api_key: "{{ (seerr_settings_slurp.content | b64decode | from_json).main.apiKey }}"
+  when:
+    - seerr_settings_slurp.content is defined
+    - ((seerr_settings_slurp.content | b64decode | from_json).main.apiKey | default('')) | length > 0
+  no_log: true
+
+- name: Fail when Seerr API key is missing from settings.json
+  ansible.builtin.fail:
+    msg: >-
+      No main.apiKey in {{ data_dir }}/services/seerr/config/settings.json.
+      Start Seerr once before deploy-homepage.
+  when:
+    - not ansible_check_mode
+    - seerr_settings_stat.stat.exists
+    - seerr_api_key | default('') | length == 0

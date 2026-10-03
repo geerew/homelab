@@ -1,0 +1,135 @@
+---
+- name: Register Seerr OIDC client in Authelia
+  ansible.builtin.import_playbook: deploy-authelia.yml
+
+- name: Deploy Seerr
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    jellyfin_api_key_app_name: seerr
+
+  pre_tasks:
+    - ansible.builtin.import_tasks: ../tasks/load-homelab-config.yml
+    - ansible.builtin.import_tasks: ../tasks/resolve-data-dir.yml
+
+  tasks:
+    - name: Validate Seerr variables in homelab.yaml
+      ansible.builtin.assert:
+        that:
+          - homelab_env.DOMAIN is defined
+          - homelab_env.DOMAIN | length > 0
+          - homelab_env.OIDC_CLIENT_SECRET is defined
+          - homelab_env.OIDC_CLIENT_SECRET | length > 0
+          - homelab_env.SONARR_ROOT_FOLDERS is defined
+          - homelab_env.SONARR_ROOT_FOLDERS | from_json | length > 0
+          - homelab_env.RADARR_ROOT_FOLDERS is defined
+          - homelab_env.RADARR_ROOT_FOLDERS | from_json | length > 0
+        fail_msg: >-
+          Set DOMAIN, authelia.oidc_client_secret, sonarr.root_folders, and radarr.root_folders in
+          {{ homelab_config_file }} (see homelab.example.yaml).
+      when: not ansible_check_mode
+
+    - name: Ensure Seerr config directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}/services/seerr/config"
+        state: directory
+        owner: "{{ homelab_env.PUID | default('1000') }}"
+        group: "{{ homelab_env.PGID | default('1000') }}"
+        mode: "0755"
+
+    - ansible.builtin.include_tasks: ../tasks/backup-service-data.yml
+      vars:
+        backup_service_name: seerr
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/compose-up-service.yml
+      vars:
+        compose_service: seerr
+
+    - name: Wait for Seerr HTTP health
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - traefik_network
+          - curlimages/curl:latest
+          - -fsS
+          - http://seerr:5055/api/v1/status
+      register: seerr_health_wait
+      until: seerr_health_wait.rc == 0
+      retries: 36
+      delay: 5
+      changed_when: false
+      when: not ansible_check_mode
+
+    - ansible.builtin.import_tasks: ../tasks/ensure-jellyfin-api-key.yml
+
+    - ansible.builtin.import_tasks: ../tasks/ensure-sonarr-api-key.yml
+
+    - ansible.builtin.import_tasks: ../tasks/ensure-radarr-api-key.yml
+
+    - ansible.builtin.import_tasks: ../tasks/bootstrap-seerr.yml
+
+    - name: Restart Seerr to load OIDC settings from settings.json
+      community.docker.docker_container:
+        name: seerr
+        state: started
+        restart: true
+      when:
+        - not ansible_check_mode
+        - seerr_bootstrap.changed | default(false)
+
+    - name: Wait for Seerr after OIDC restart
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - traefik_network
+          - curlimages/curl:latest
+          - -fsS
+          - http://seerr:5055/api/v1/status
+      register: seerr_post_restart_health
+      until: seerr_post_restart_health.rc == 0
+      retries: 36
+      delay: 5
+      changed_when: false
+      when:
+        - not ansible_check_mode
+        - seerr_bootstrap.changed | default(false)
+
+    - name: Verify Seerr exposes Authelia on the login page
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --network
+          - traefik_network
+          - curlimages/curl:latest
+          - -fsS
+          - http://seerr:5055/api/v1/settings/public
+      register: seerr_public_settings
+      changed_when: false
+      failed_when: >-
+        (seerr_public_settings.stdout | from_json).openIdProviders
+        | selectattr('slug', 'equalto', 'authelia')
+        | list
+        | length == 0
+      when: not ansible_check_mode
+
+    - name: Report Seerr deploy status
+      ansible.builtin.debug:
+        msg: >-
+          {% if ansible_check_mode %}
+          Check mode: run without --check to deploy Seerr from {{ homelab_config_file }}.
+          {% elif seerr_bootstrap.changed | default(false) %}
+          Seerr at https://seerr.{{ homelab_env.DOMAIN }}/ — Authelia OIDC + Jellyfin sign-in;
+          users pick 720p/1080p quality in Advanced (720p default); scan enabled for availability.
+          {% else %}
+          Seerr unchanged — settings already in sync with homelab.yaml.
+          {% endif %}

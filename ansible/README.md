@@ -231,7 +231,7 @@ Widget secrets are read from `.env` only (nothing sensitive is committed in Ansi
 | Sonarr | Auto — API key from `services/sonarr/config/config.xml` (run `deploy sonarr` first) |
 | Radarr | Auto — API key from `services/radarr/config/config.xml` (run `deploy radarr` first) |
 | Bazarr | Auto — API key from `services/bazarr/config/config/config.yaml` (run `deploy bazarr` first) |
-| Seerr | `HOMEPAGE_SEERR_API_KEY` |
+| Seerr | Auto — API key from `services/seerr/config/settings.json` (run `deploy seerr` first) |
 | Traefik widget | none — internal API is `insecure: true`; dashboard auth is Authelia at the edge |
 | Dispatcharr | `DISPATCHARR_ADMIN_*` |
 | Gluetun | Auto — control API key in `services/gluetun/control_api_key` (see `deploy-gluetun.yml`) |
@@ -278,7 +278,7 @@ Use `password:` for plain text (Ansible hashes with argon2 at deploy time), or `
 
 Generate a JWKS PEM once and paste into `authelia.jwks_private_key` (see root [README.md](../README.md)).
 
-**OIDC clients** — structure (redirect URIs, scopes, etc.) lives in [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml). Active clients: Audiobookshelf, Jellyfin, Mealie, Memos, Sparky Fitness.
+**OIDC clients** — structure (redirect URIs, scopes, etc.) lives in [`vars/authelia_oidc_clients.yml`](vars/authelia_oidc_clients.yml). Active clients: Audiobookshelf, Jellyfin, Mealie, Memos, Paperless, Seerr, Sparky Fitness.
 
 **Access control** — `vpn-status.${DOMAIN}` bypass auto-detects `traefik_network` and `socket_proxy` subnets via [`tasks/resolve-docker-network-subnets.yml`](tasks/resolve-docker-network-subnets.yml).
 

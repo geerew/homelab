@@ -604,7 +604,8 @@ services:
       - kuma.sparky.http.interval=60
 
   seerr:
-    image: ghcr.io/seerr-team/seerr:latest
+    # preview-new-oidc until OIDC lands in stable — required for Authelia sign-in
+    image: ghcr.io/seerr-team/seerr:preview-new-oidc
     container_name: seerr
     init: true
     restart: unless-stopped

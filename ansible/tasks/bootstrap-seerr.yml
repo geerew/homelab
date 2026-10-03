@@ -1,0 +1,77 @@
+---
+- name: Bootstrap Seerr Jellyfin, Sonarr, and Radarr settings
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - --network
+      - traefik_network
+      - -v
+      - "{{ data_dir }}/services/seerr/config:/app/config"
+      - -v
+      - "{{ playbook_dir }}/../scripts/bootstrap_seerr.py:/bootstrap_seerr.py:ro"
+      - -e
+      - SEERR_URL=http://seerr:5055
+      - -e
+      - SEERR_SETTINGS_FILE=/app/config/settings.json
+      - -e
+      - SEERR_DB_FILE=/app/config/db/db.sqlite3
+      - -e
+      - DOMAIN={{ homelab_env.DOMAIN }}
+      - -e
+      - JELLYFIN_PUBLIC_HOST=tv.{{ homelab_env.DOMAIN }}
+      - -e
+      - JELLYFIN_API_KEY={{ jellyfin_api_key }}
+      - -e
+      - SONARR_API_KEY={{ sonarr_api_key }}
+      - -e
+      - RADARR_API_KEY={{ radarr_api_key }}
+      - -e
+      - SONARR_HOST=gluetun
+      - -e
+      - SONARR_PORT={{ homelab_env.SONARR_PORT | default('8989') }}
+      - -e
+      - RADARR_HOST=gluetun
+      - -e
+      - RADARR_PORT={{ homelab_env.RADARR_PORT | default('7878') }}
+      - -e
+      - SEERR_SONARR_QUALITY_PROFILE={{ homelab_env.SEERR_SONARR_QUALITY_PROFILE | default('') }}
+      - -e
+      - SEERR_SONARR_ROOT_FOLDER={{ homelab_env.SEERR_SONARR_ROOT_FOLDER | default('') }}
+      - -e
+      - SEERR_RADARR_QUALITY_PROFILE={{ homelab_env.SEERR_RADARR_QUALITY_PROFILE | default('') }}
+      - -e
+      - SEERR_RADARR_ROOT_FOLDER={{ homelab_env.SEERR_RADARR_ROOT_FOLDER | default('') }}
+      - -e
+      - SEERR_ADMIN_EMAIL={{ homelab_env.SEERR_ADMIN_EMAIL | default('') }}
+      - -e
+      - SEERR_ADMIN_PASSWORD={{ homelab_env.SEERR_ADMIN_PASSWORD | default('') }}
+      - -e
+      - SEERR_LOCAL_LOGIN={{ homelab_env.SEERR_LOCAL_LOGIN | default('false') }}
+      - -e
+      - SEERR_OIDC_CLIENT_ID={{ homelab_env.SEERR_OIDC_CLIENT_ID | default('seerr') }}
+      - -e
+      - SEERR_OIDC_NEW_USER_LOGIN={{ homelab_env.SEERR_OIDC_NEW_USER_LOGIN | default('true') }}
+      - -e
+      - OIDC_CLIENT_SECRET={{ homelab_env.OIDC_CLIENT_SECRET }}
+      - -e
+      - OIDC_ISSUER_URL=https://auth.{{ homelab_env.DOMAIN }}
+      - -e
+      - SONARR_QUALITY_PROFILES={{ homelab_env.SONARR_QUALITY_PROFILES }}
+      - -e
+      - SONARR_ROOT_FOLDERS={{ homelab_env.SONARR_ROOT_FOLDERS }}
+      - -e
+      - RADARR_QUALITY_PROFILES={{ homelab_env.RADARR_QUALITY_PROFILES }}
+      - -e
+      - RADARR_ROOT_FOLDERS={{ homelab_env.RADARR_ROOT_FOLDERS }}
+      - python:3.12-slim
+      - sh
+      - -c
+      - python /bootstrap_seerr.py
+  register: seerr_bootstrap
+  changed_when: >-
+    'nothing to change' not in seerr_bootstrap.stderr
+    or 'seerr restart required' in seerr_bootstrap.stderr
+  no_log: true
+  when: not ansible_check_mode

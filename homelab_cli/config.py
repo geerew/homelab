@@ -219,8 +219,16 @@ def env_to_config(env: dict[str, str], users: dict[str, Any] | None = None, jwks
             "admin_password": env.get("JELLYSCOPE_ADMIN_PASSWORD", ""),
             "secret_key": env.get("JELLYSCOPE_SECRET_KEY", ""),
         },
-        "homepage": {
-            "seerr_api_key": env.get("HOMEPAGE_SEERR_API_KEY", ""),
+        "seerr": {
+            "admin_email": env.get("SEERR_ADMIN_EMAIL", ""),
+            "admin_password": env.get("SEERR_ADMIN_PASSWORD", ""),
+            "local_login": env.get("SEERR_LOCAL_LOGIN", "false").lower() in {"1", "true", "yes"},
+            "oidc_new_user_login": env.get("SEERR_OIDC_NEW_USER_LOGIN", "true").lower()
+            in {"1", "true", "yes"},
+            "sonarr_quality_profile": env.get("SEERR_SONARR_QUALITY_PROFILE", ""),
+            "sonarr_root_folder": env.get("SEERR_SONARR_ROOT_FOLDER", ""),
+            "radarr_quality_profile": env.get("SEERR_RADARR_QUALITY_PROFILE", ""),
+            "radarr_root_folder": env.get("SEERR_RADARR_ROOT_FOLDER", ""),
         },
         "mcclean": {
             "admin_username": env.get("MCCLEAN_ADMIN_USERNAME", "admin"),
@@ -282,7 +290,7 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
     kuma = cfg.get("uptime_kuma", {})
     js = cfg.get("jellyscope", {})
     jf = cfg.get("jellyfin", {})
-    hp = cfg.get("homepage", {})
+    seerr = cfg.get("seerr", {})
     mc = cfg.get("mcclean", {})
     dp = cfg.get("dispatcharr", {})
 
@@ -543,7 +551,15 @@ def flatten_config(cfg: dict[str, Any]) -> dict[str, str]:
         "SONARR_QUALITY_DEFINITIONS": sonarr_quality_definitions_json,
         "SONARR_LIBRARY_IMPORT": sonarr_library_import_json,
         "BAZARR_SETTINGS": bazarr_settings_json,
-        "HOMEPAGE_SEERR_API_KEY": str(hp.get("seerr_api_key", "")),
+        "SEERR_ADMIN_EMAIL": str(seerr.get("admin_email", "")),
+        "SEERR_ADMIN_PASSWORD": str(seerr.get("admin_password", "")),
+        "SEERR_LOCAL_LOGIN": str(seerr.get("local_login", False)).lower(),
+        "SEERR_OIDC_CLIENT_ID": "seerr",
+        "SEERR_OIDC_NEW_USER_LOGIN": str(seerr.get("oidc_new_user_login", True)).lower(),
+        "SEERR_SONARR_QUALITY_PROFILE": str(seerr.get("sonarr_quality_profile", "")),
+        "SEERR_SONARR_ROOT_FOLDER": str(seerr.get("sonarr_root_folder", "")),
+        "SEERR_RADARR_QUALITY_PROFILE": str(seerr.get("radarr_quality_profile", "")),
+        "SEERR_RADARR_ROOT_FOLDER": str(seerr.get("radarr_root_folder", "")),
         "MCCLEAN_ADMIN_USERNAME": str(mc.get("admin_username", "admin")),
         "MCCLEAN_ADMIN_PASSWORD": str(mc.get("admin_password", "")),
         "DISPATCHARR_ADMIN_USERNAME": str(dp.get("admin_username", "admin")),

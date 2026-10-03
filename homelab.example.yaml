@@ -92,9 +92,14 @@ authelia:
         - admins
         - paperless-admin
 
-# --- Monitoring & dashboard ---
-homepage:
-  seerr_api_key: ''
+# --- Media requests (Authelia OIDC + Jellyfin login; API keys are automatic) ---
+seerr:
+  # Uses preview-new-oidc image until OIDC is in stable Seerr
+  local_login: false          # break-glass only — set true + admin_* for empty DB
+  oidc_new_user_login: true   # auto-create Seerr users on first Authelia sign-in
+  # Users pick HD-720p or HD-1080p in Advanced (720p default); admin still approves requests
+  sonarr_root_folder: ''      # optional override (default: last sonarr.root_folders entry)
+  radarr_root_folder: ''      # optional override (default: last radarr.root_folders entry)
 
 # --- VPN & *arr stack ---
 gluetun:

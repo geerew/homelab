@@ -71,6 +71,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | `deploy-sonarr.yml` / `deploy-radarr.yml` | Prowlarr indexers + qBittorrent creds in `homelab.yaml` |
 | `deploy-bazarr.yml` | Sonarr + Radarr running |
 | `deploy-jellyfin.yml` | Dispatcharr M3U populated at `http://dispatcharr:9191/output/m3u/` |
+| `deploy-seerr.yml` | Jellyfin + Sonarr + Radarr running (API keys read from their configs) |
 | `deploy-homepage.yml` | Nothing hard — deploy last so widget URLs match live services |
 
 ---
@@ -99,6 +100,7 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | **Radarr** | `deploy-radarr.yml` | **Yes** — root folders, Prowlarr indexers, qBittorrent, naming/quality profiles |
 | **Bazarr** | `deploy-bazarr.yml` | **Yes** — Sonarr/Radarr links, language profiles, subtitle providers |
 | **Jellyfin** | `deploy-jellyfin.yml` | **Yes** — libraries, plugins, SSO, VAAPI, Live TV; Trakt OAuth still manual |
+| **Seerr** | `deploy-seerr.yml` | **Yes** — Authelia OIDC + Jellyfin login (no local login); Sonarr/Radarr linked |
 | **Jellyscope** | `deploy-jellyscope.yml` | **Yes** — admin + Jellyfin API key from Ansible |
 | **Homepage** | `deploy-homepage.yml` | **Yes** — service list + widgets; API keys auto where possible |
 
@@ -106,7 +108,6 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 | Service | Status | Notes |
 | --- | --- | --- |
-| **Seerr** | ⬜ Todo | Jellyfin + *arr integration, OIDC |
 | **Sparky Fitness** | ⬜ Todo | DB passwords + auth secrets in `homelab.yaml` |
 | **McClean** | ⬜ Todo | `mcclean.admin_*` in `homelab.yaml` |
 
@@ -428,6 +429,22 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 ---
 
+### Seerr — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-seerr.yml` |
+| **In `deploy-services.yml`** | Yes (after Jellyfin, before Jellyscope) |
+| **Ansible sources** | `scripts/bootstrap_seerr.py`, `tasks/ensure-seerr-api-key.yml` |
+| **`homelab.yaml` keys** | Optional `seerr.admin_*` (first local admin only), optional `seerr.*_quality_profile` / `*_root_folder` overrides |
+| **Configured by Ansible** | Backs up `services/seerr/config/`; `preview-new-oidc` image; Authelia OIDC client + `settings.json` provider; Jellyfin at `tv.<domain>:443`; Sonarr/Radarr via `gluetun`; movie/show libraries enabled |
+| **Still in Compose only** | Traefik labels (Authelia forward-auth off — Seerr handles OIDC in-app), Kuma labels |
+| **Auth note** | Authelia OIDC + Jellyfin login only (`localLogin: false`). Traefik Authelia stays off so the in-app login page works |
+| **`homelab.yaml` keys** | `authelia.oidc_client_secret`, optional `seerr.oidc_new_user_login`, optional `seerr.local_login` for break-glass |
+| **Fresh stand-up** | Run after `deploy-jellyfin.yml`, `deploy-sonarr.yml`, and `deploy-radarr.yml` |
+
+---
+
 ### Jellyscope — ✅
 
 | | |
@@ -448,7 +465,6 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 | Service | Config location | Suggested `deploy-*` scope |
 | --- | --- | --- |
-| **Seerr** | `services/seerr/config/` | `deploy-seerr.yml` — Jellyfin link, Sonarr/Radarr, OIDC |
 | **Sparky Fitness** | DB + uploads + Compose env | `deploy-sparkyfitness.yml` — DB passwords, auth secrets from `homelab.yaml` |
 | **McClean** | `services/mccleanengineering/data/` | `deploy-mcclean.yml` — `mcclean.admin_*` from `homelab.yaml`. **If login fails** with `readonly database`: stop container, delete `data.db-wal` + `data.db-shm`, restart |
 
@@ -464,7 +480,7 @@ Most services are done. Remaining work:
 4. ~~**Gluetun + *arr stack** (Prowlarr → Sonarr → Radarr → Bazarr + qBittorrent)~~ — done
 5. ~~**Dispatcharr + Jellyfin + Jellyscope**~~ — done
 6. ~~**Homepage**~~ — done (includes Paperless tile)
-7. **Seerr** — depends on Jellyfin + *arr (next priority)
+7. ~~**Seerr**~~ — done (Jellyfin + Sonarr/Radarr; no Authelia at edge)
 8. **Sparky Fitness / McClean** — as needed
 
 ---

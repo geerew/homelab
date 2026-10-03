@@ -8,7 +8,7 @@
   ansible.builtin.fail:
     msg: >-
       {{ data_dir }}/services/radarr/config/config.xml not found.
-      Run deploy radarr first — Homepage reads the API key from Radarr's config.
+      Run deploy radarr first — Seerr reads the API key from Radarr's config.
   when:
     - not ansible_check_mode
     - not radarr_config_stat.stat.exists
@@ -20,7 +20,7 @@
   when: radarr_config_stat.stat.exists | default(false)
   no_log: true
 
-- name: Set Radarr API key fact for Homepage
+- name: Set Radarr API key fact
   ansible.builtin.set_fact:
     radarr_api_key: >-
       {{ radarr_config_xml.content | b64decode | regex_search('(?<=<ApiKey>)[^<]+') }}
@@ -33,7 +33,7 @@
   ansible.builtin.fail:
     msg: >-
       No ApiKey in {{ data_dir }}/services/radarr/config/config.xml.
-      Start Radarr once before deploy-homepage.
+      Start Radarr once before deploy-seerr.
   when:
     - not ansible_check_mode
     - radarr_config_stat.stat.exists

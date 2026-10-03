@@ -31,6 +31,7 @@ DEPLOY_ORDER: list[str] = [
     "radarr",
     "bazarr",
     "jellyfin",
+    "seerr",
     "jellyscope",
     "homepage",
 ]

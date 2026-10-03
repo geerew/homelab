@@ -85,6 +85,9 @@
 - name: Deploy Jellyfin
   ansible.builtin.import_playbook: deploy-jellyfin.yml
 
+- name: Deploy Seerr
+  ansible.builtin.import_playbook: deploy-seerr.yml
+
 - name: Deploy Jellyscope
   ansible.builtin.import_playbook: deploy-jellyscope.yml
 

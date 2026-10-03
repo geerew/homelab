@@ -31,8 +31,6 @@
           - homelab_env.AUDIOBOOKSHELF_ROOT_USERNAME | length > 0
           - homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD is defined
           - homelab_env.AUDIOBOOKSHELF_ROOT_PASSWORD | length > 0
-          - homelab_env.HOMEPAGE_SEERR_API_KEY is defined
-          - homelab_env.HOMEPAGE_SEERR_API_KEY | length > 0
           - homelab_env.MEALIE_ADMIN_USERNAME is defined
           - homelab_env.MEALIE_ADMIN_USERNAME | length > 0
         fail_msg: >-
@@ -62,6 +60,8 @@
 
     - name: Ensure Bazarr API key for Homepage widget
       ansible.builtin.import_tasks: ../tasks/ensure-bazarr-api-key.yml
+
+    - ansible.builtin.import_tasks: ../tasks/ensure-seerr-api-key.yml
 
     - name: Verify homepage key is listed in Jellyfin
       ansible.builtin.uri:

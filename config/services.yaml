@@ -57,7 +57,8 @@ services:
   sparkyfitness-frontend:
     deploy_playbook: null
   seerr:
-    deploy_playbook: null
+    deploy_playbook: deploy-seerr.yml
+    backup: true
   gluetun:
     deploy_playbook: deploy-gluetun.yml
     stack: gluetun_vpn
