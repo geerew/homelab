@@ -5,11 +5,11 @@ Step through services one at a time until each has a `deploy-<service>.yml` play
 **Pattern for each service:**
 
 1. Add `playbooks/deploy-<service>.yml`
-2. Put secrets in `.env` / `.env.example` (never commit secrets to Ansible)
+2. Put secrets in `homelab.yaml` / `homelab.example.yaml` (never commit secrets to Ansible)
 3. Put static config in `files/<service>/`
 4. Put templated config in `templates/<service>/*.j2`
 5. Import the playbook from `playbooks/deploy-services.yml` when ready
-6. Document required `.env` keys in this file and `README.md`
+6. Document required `homelab.yaml` keys in this file and `README.md`
 
 **Legend**
 
@@ -28,19 +28,27 @@ ansible-playbook playbooks/site.yml              # 1. dirs + docker compose up (
 ansible-playbook playbooks/deploy-services.yml   # 2. all app config in dependency order
 ```
 
-Or step through individually (same order as `deploy-services.yml`):
+Or step through individually (same order as `deploy-services.yml` — see that file for the full list):
 
 ```bash
-ansible-playbook playbooks/deploy-socket-proxy.yml     # Docker API proxy; before Traefik
-ansible-playbook playbooks/deploy-watchtower.yml       # auto-updates
-ansible-playbook playbooks/deploy-dozzle.yml          # container logs UI
-ansible-playbook playbooks/deploy-traefik.yml          # edge config
-ansible-playbook playbooks/deploy-cloudflare-ddns.yml  # DNS records from .env
-ansible-playbook playbooks/deploy-authelia.yml         # auth; needs Docker networks from site.yml
-ansible-playbook playbooks/deploy-gluetun.yml          # VPN before *arr / qBittorrent
-ansible-playbook playbooks/deploy-dispatcharr.yml      # IPTV; before Jellyfin Live TV
-ansible-playbook playbooks/deploy-qbittorrent.yml      # WebUI on gluetun network
-ansible-playbook playbooks/deploy-jellyfin.yml         # M3U tuner → Dispatcharr
+ansible-playbook playbooks/deploy-socket-proxy.yml
+ansible-playbook playbooks/deploy-traefik.yml
+ansible-playbook playbooks/deploy-authelia.yml
+ansible-playbook playbooks/deploy-uptime-kuma.yml
+ansible-playbook playbooks/deploy-autokuma.yml
+ansible-playbook playbooks/deploy-memos.yml
+ansible-playbook playbooks/deploy-audiobookshelf.yml
+ansible-playbook playbooks/deploy-mealie.yml
+ansible-playbook playbooks/deploy-paperless.yml
+ansible-playbook playbooks/deploy-gluetun.yml
+ansible-playbook playbooks/deploy-dispatcharr.yml
+ansible-playbook playbooks/deploy-qbittorrent.yml
+ansible-playbook playbooks/deploy-prowlarr.yml
+ansible-playbook playbooks/deploy-sonarr.yml
+ansible-playbook playbooks/deploy-radarr.yml
+ansible-playbook playbooks/deploy-bazarr.yml
+ansible-playbook playbooks/deploy-jellyfin.yml
+ansible-playbook playbooks/deploy-jellyscope.yml
 ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 ```
 
@@ -58,26 +66,49 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 | `deploy-gluetun.yml` | `site.yml` |
 | `deploy-dispatcharr.yml` | `site.yml` (Dispatcharr container on `:9191`; also ensures Gluetun stack is up) |
 | `deploy-qbittorrent.yml` | Gluetun running (shared network namespace) |
+| `deploy-paperless.yml` | Authelia OIDC client + `paperless.*` in `homelab.yaml` |
+| `deploy-prowlarr.yml` | Gluetun stack running |
+| `deploy-sonarr.yml` / `deploy-radarr.yml` | Prowlarr indexers + qBittorrent creds in `homelab.yaml` |
+| `deploy-bazarr.yml` | Sonarr + Radarr running |
 | `deploy-jellyfin.yml` | Dispatcharr M3U populated at `http://dispatcharr:9191/output/m3u/` |
 | `deploy-homepage.yml` | Nothing hard — deploy last so widget URLs match live services |
 
 ---
 
-## Summary — your question
+## Summary
 
 | Service | Playbook | Fully configured? |
 | --- | --- | --- |
-| **Socket Proxy** | `deploy-socket-proxy.yml` | **Yes** — API filter flags in `.env`; no on-disk config |
-| **Watchtower** | `deploy-watchtower.yml` | **Yes** — poll/cleanup settings in `.env`; no on-disk config |
-| **Dozzle** | `deploy-dozzle.yml` | **Yes** — log viewer settings in `.env`; no on-disk config |
-| **Traefik** | `deploy-traefik.yml` | **Yes** — static config + Authelia forward-auth middleware; `acme.json` is runtime |
-| **Cloudflare DDNS** | `deploy-cloudflare-ddns.yml` | **Yes** — settings in `.env`; no on-disk config |
-| **Authelia** | `deploy-authelia.yml` | **Yes** — `users.yml` + `configuration.yml` templated; SQLite DB + notification log are auto-created at runtime (not Ansible todos) |
-| **Dispatcharr** | `deploy-dispatcharr.yml` | **Yes** — admin, M3U/XC provider, XC password, EPL/sports channel groups, auto channel sync |
-| **Gluetun** | `deploy-gluetun.yml` | **Yes** — VPN settings in `.env`, HTTP control-server auth in `config.toml`; ports/Traefik labels stay in Compose |
-| **Jellyfin** | `deploy-jellyfin.yml` | **Yes** — libraries, plugins, SSO, VAAPI encoding, Live TV, branding/CSS; Trakt OAuth still manual |
-| **qBittorrent** | `deploy-qbittorrent.yml` | **Mostly for WebUI** — port + LAN auth bypass; BitTorrent session prefs intentionally left to UI on existing installs |
-| **Homepage** | `deploy-homepage.yml` | **Yes** — service list + widgets from `.env`; static YAML including `bookmarks.yaml` |
+| **Socket Proxy** | `deploy-socket-proxy.yml` | **Yes** — API filter flags in `homelab.yaml` |
+| **Watchtower** | `deploy-watchtower.yml` | **Yes** — poll/cleanup in `homelab.yaml` |
+| **Dozzle** | `deploy-dozzle.yml` | **Yes** — log viewer settings in `homelab.yaml` |
+| **Traefik** | `deploy-traefik.yml` | **Yes** — static config + Authelia forward-auth; `acme.json` is runtime |
+| **Cloudflare DDNS** | `deploy-cloudflare-ddns.yml` | **Yes** — DNS settings in `homelab.yaml` |
+| **Authelia** | `deploy-authelia.yml` | **Yes** — users + OIDC clients templated; SQLite DB auto-created |
+| **Uptime Kuma** | `deploy-uptime-kuma.yml` | **Yes** — container + status page sync |
+| **Autokuma** | `deploy-autokuma.yml` | **Yes** — monitors from Compose labels + status page groups |
+| **Memos** | `deploy-memos.yml` | **Yes** — Authelia OIDC via `/etc/secrets`, SSO-only |
+| **Audiobookshelf** | `deploy-audiobookshelf.yml` | **Yes** — libraries, volumes, Authelia OIDC bootstrap |
+| **Mealie** | `deploy-mealie.yml` | **Yes** — Authelia OIDC, service admin, optional OpenAI provider |
+| **Paperless** | `deploy-paperless.yml` | **Yes** — Authelia OIDC, group sync, UK dates, `pg_dump` backup/restore |
+| **Gluetun** | `deploy-gluetun.yml` | **Yes** — VPN in `homelab.yaml`, control API key auto-generated |
+| **Dispatcharr** | `deploy-dispatcharr.yml` | **Yes** — M3U/XC, EPL channel groups, auto sync |
+| **qBittorrent** | `deploy-qbittorrent.yml` | **Mostly** — WebUI port + LAN auth bypass; session prefs on existing installs left to UI |
+| **Prowlarr** | `deploy-prowlarr.yml` | **Yes** — Cardigann indexers from `homelab.yaml` |
+| **Sonarr** | `deploy-sonarr.yml` | **Yes** — root folders, Prowlarr indexers, qBittorrent, naming/quality profiles |
+| **Radarr** | `deploy-radarr.yml` | **Yes** — root folders, Prowlarr indexers, qBittorrent, naming/quality profiles |
+| **Bazarr** | `deploy-bazarr.yml` | **Yes** — Sonarr/Radarr links, language profiles, subtitle providers |
+| **Jellyfin** | `deploy-jellyfin.yml` | **Yes** — libraries, plugins, SSO, VAAPI, Live TV; Trakt OAuth still manual |
+| **Jellyscope** | `deploy-jellyscope.yml` | **Yes** — admin + Jellyfin API key from Ansible |
+| **Homepage** | `deploy-homepage.yml` | **Yes** — service list + widgets; API keys auto where possible |
+
+### Remaining (no deploy playbook)
+
+| Service | Status | Notes |
+| --- | --- | --- |
+| **Seerr** | ⬜ Todo | Jellyfin + *arr integration, OIDC |
+| **Sparky Fitness** | ⬜ Todo | DB passwords + auth secrets in `homelab.yaml` |
+| **McClean** | ⬜ Todo | `mcclean.admin_*` in `homelab.yaml` |
 
 ---
 
@@ -225,6 +256,62 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 ---
 
+### Prowlarr — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-prowlarr.yml` |
+| **In `deploy-services.yml`** | Yes (after qBittorrent) |
+| **Ansible sources** | `tasks/bootstrap-prowlarr.yml` |
+| **`homelab.yaml` keys** | `prowlarr.indexers` (Cardigann definitions, credentials for private indexers) |
+| **Configured by Ansible** | Backs up `services/prowlarr/`; indexers from yaml; Sonarr/Radarr pull via Torznab (no Applications sync) |
+| **Still outside Ansible** | Indexer health history, download client settings |
+| **Fresh stand-up** | Set indexers in `homelab.yaml`, run after Gluetun stack is up |
+
+---
+
+### Sonarr — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-sonarr.yml` |
+| **In `deploy-services.yml`** | Yes (after Prowlarr) |
+| **Ansible sources** | Sonarr bootstrap from `homelab.yaml` (root folders, indexers, download clients, naming, quality profiles) |
+| **`homelab.yaml` keys** | `sonarr.volumes`, `sonarr.root_folders`, `sonarr.indexers`, `sonarr.naming`, `sonarr.quality_*`, `qbittorrent.webui_*` |
+| **Configured by Ansible** | Backs up `services/sonarr/`; Prowlarr Torznab indexers; qBittorrent download client; optional library import |
+| **Still outside Ansible** | Series metadata, download queue state |
+| **Fresh stand-up** | Deploy Prowlarr first; indexers in `sonarr.indexers` must match Prowlarr indexer names |
+
+---
+
+### Radarr — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-radarr.yml` |
+| **In `deploy-services.yml`** | Yes (after Sonarr) |
+| **Ansible sources** | Radarr bootstrap from `homelab.yaml` |
+| **`homelab.yaml` keys** | `radarr.volumes`, `radarr.root_folders`, `radarr.indexers`, `radarr.naming`, `radarr.quality_*`, `qbittorrent.webui_*` |
+| **Configured by Ansible** | Backs up `services/radarr/`; Prowlarr Torznab indexers; qBittorrent; naming/media/quality profiles; optional library import |
+| **Still outside Ansible** | Movie metadata, download queue state |
+| **Fresh stand-up** | Same pattern as Sonarr — Prowlarr indexers referenced by name |
+
+---
+
+### Bazarr — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-bazarr.yml` |
+| **In `deploy-services.yml`** | Yes (after Radarr) |
+| **Ansible sources** | Bazarr bootstrap from `homelab.yaml` |
+| **`homelab.yaml` keys** | `bazarr.volumes`, `bazarr.sonarr`, `bazarr.radarr`, `bazarr.languages`, `bazarr.providers` |
+| **Configured by Ansible** | Backs up `services/bazarr/`; links to Sonarr/Radarr; language profiles + subtitle providers |
+| **Still outside Ansible** | Subtitle download history, manual subtitle edits |
+| **Fresh stand-up** | Deploy Sonarr + Radarr first |
+
+---
+
 ### Jellyfin — ✅
 
 | | |
@@ -298,6 +385,49 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 ---
 
+### Audiobookshelf — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-audiobookshelf.yml` |
+| **In `deploy-services.yml`** | Yes (after Memos) |
+| **Ansible sources** | `scripts/bootstrap_audiobookshelf.py`, volume/library config from `homelab.yaml` |
+| **`homelab.yaml` keys** | `audiobookshelf.volumes`, `audiobookshelf.libraries`, `root_username`, `root_password`, `authelia.oidc_client_secret`, `DOMAIN` |
+| **Configured by Ansible** | Backs up `services/audiobookshelf/`; libraries + OIDC auth settings via API bootstrap |
+| **Still outside Ansible** | Audiobook metadata, playback progress, user accounts beyond bootstrap |
+| **Fresh stand-up** | Set libraries/volumes + root creds in `homelab.yaml`, run after `deploy-authelia.yml` |
+
+---
+
+### Mealie — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-mealie.yml` |
+| **In `deploy-services.yml`** | Yes (after Audiobookshelf) |
+| **Ansible sources** | `tasks/bootstrap-mealie.yml` |
+| **`homelab.yaml` keys** | `mealie.admin_*`, `mealie.openai_api_key` (optional), `authelia.oidc_client_secret`, `DOMAIN` |
+| **Configured by Ansible** | Backs up `services/mealie/`; Authelia OIDC (password login hidden); service admin for Homepage; optional OpenAI group provider |
+| **Still outside Ansible** | Recipes, images, households in SQLite |
+| **Fresh stand-up** | Set `mealie.admin_*` + OIDC secret, run after Authelia. OIDC groups: `mealie-admins` / `mealie-users`. |
+
+---
+
+### Paperless — ✅
+
+| | |
+| --- | --- |
+| **Playbook** | `playbooks/deploy-paperless.yml` |
+| **In `deploy-services.yml`** | Yes (after Mealie) |
+| **Ansible sources** | `templates/paperless/compose.env.j2`, `tasks/ensure-paperless-secret-key.yml`, `tasks/ensure-paperless-date-locale.yml`, OIDC client in `vars/authelia_oidc_clients.yml` |
+| **`homelab.yaml` keys** | `paperless.admin_*`, `paperless.db_password`, `paperless.ocr_language`, `authelia.oidc_client_secret`, `DOMAIN` |
+| **Configured by Ansible** | Valkey + PostgreSQL + app stack; auto-generated `secret_key`; Authelia OIDC always on; group sync (`paperless-admin` superuser); UK date locale (`en-gb`) + `PAPERLESS_DATE_ORDER=DMY`; break-glass admin with no email (OIDC-safe) |
+| **Backup / restore** | `homelab backup paperless` — files + `postgres.dump`; `homelab restore paperless <id> --yes` |
+| **Still outside Ansible** | Documents, tags, matching rules, correspondents (create in UI); Paperless groups must match Authelia group names |
+| **Fresh stand-up** | Set `paperless.*` in `homelab.yaml`, run after Authelia. Enable SSO in Paperless Settings → Security on first login if needed. |
+
+---
+
 ### Jellyscope — ✅
 
 | | |
@@ -314,73 +444,28 @@ ansible-playbook playbooks/deploy-homepage.yml         # widgets last
 
 ---
 
-## Services without deploy playbooks (todo)
+## Services without deploy playbooks (remaining)
 
-Priority suggestion: **Authelia + Traefik** (auth edge) → ***arr stack** (Sonarr/Radarr/Prowlarr/Bazarr) → **Seerr** → OIDC apps → rest.
-
-### Core / edge
-
-| Service | Compose only today | Config location | Suggested `deploy-*` scope |
-| --- | --- | --- | --- |
-| **Traefik** | ✅ | `services/traefik/traefik.yml`, `dynamic/authelia.yml`, `acme/acme.json` | `deploy-traefik.yml` — static + Authelia middleware; per-service routes stay on Compose labels |
-| **Authelia** | ✅ | `services/authelia/config/configuration.yml`, `users.yml` | `deploy-authelia.yml` — config done; `db.sqlite3` / `notification.txt` auto-created at runtime |
-| **Cloudflare DDNS** | ✅ | `.env` only | `deploy-cloudflare-ddns.yml` — DNS record settings in `.env` |
-| **Socket proxy** | ✅ | `.env` only | `deploy-socket-proxy.yml` — Docker API filter flags |
-| **Watchtower** | ✅ | `.env` only | `deploy-watchtower.yml` — poll interval, cleanup, label enable |
-
-### Monitoring / ops
-
-| Service | Compose only today | Config location | Suggested `deploy-*` scope |
-| --- | --- | --- | --- |
-| **Uptime Kuma** | ✅ | `services/uptime-kuma/data/` (SQLite) | `deploy-uptime-kuma.yml` — container + status page API sync |
-| **Autokuma** | ✅ | `services/autokuma/data/` | `deploy-autokuma.yml` — label sync + status page groups |
-| **Dozzle** | ✅ | `.env` only | `deploy-dozzle.yml` — log level, filter, Socket Proxy host, forward-auth header |
-
-### Media stack (*arr + requests)
-
-| Service | Compose only today | Config location | Suggested `deploy-*` scope |
-| --- | --- | --- | --- |
-| **Sonarr** | ⬜ | `services/sonarr/config/config.xml` + DB | `deploy-sonarr.yml` — root folders, qBittorrent download client, Prowlarr indexer sync, API key → `.env` for Homepage/Kuma |
-| **Radarr** | ✅ | `homelab.yaml` + `services/radarr/config/` | `deploy-radarr.yml` — volumes, root folders, Prowlarr Torznab indexers, qBittorrent, naming/media/quality profiles |
-| **Prowlarr** | ✅ | `homelab.yaml` + `services/prowlarr/config/` | `deploy-prowlarr.yml` — external auth (hardcoded) + Cardigann indexers from yaml; Sonarr/Radarr pull via Torznab (no Applications sync) |
-| **Bazarr** | ⬜ | `services/bazarr/config/` | `deploy-bazarr.yml` — language profiles, links to Sonarr/Radarr |
-| **Seerr** | ⬜ | `services/seerr/config/` | `deploy-seerr.yml` — Jellyfin/Plex link, Sonarr/Radarr, OIDC |
-
-### Media apps
-
-| Service | Compose only today | Config location | Suggested `deploy-*` scope |
-| --- | --- | --- | --- |
-| **Audiobookshelf** | ✅ | `homelab.yaml` + `services/audiobookshelf/config/` | `deploy-audiobookshelf.yml` — backups, volumes/libraries in yaml, OIDC bootstrap |
-| **Mealie** | ✅ | `services/mealie/` (`data/` is the Docker mount) | `deploy-mealie.yml` — full service dir backed up; Authelia OIDC; optional OpenAI key in `homelab.yaml` |
-
-### Other apps
-
-| Service | Compose only today | Config location | Suggested `deploy-*` scope |
-| --- | --- | --- | --- |
-| **Jellyscope** | ✅ | `services/jellyscope/data/` | `deploy-jellyscope.yml` — admin from `.env`, Jellyfin key auto-ensured |
-| **Sparky Fitness** | ⬜ | DB + uploads + Compose env | `deploy-sparkyfitness.yml` — DB passwords, auth secrets from `.env` (many keys already in `.env`) |
-| **Memos** | ✅ | `services/memos/secrets/` + SQLite | `deploy-memos.yml` — Authelia OIDC via `/etc/secrets` |
-| **McClean** | ⬜ | `services/mccleanengineering/data/` | `deploy-mcclean.yml` — `MCCLEAN_ADMIN_*` from `.env`. **If login fails after migration** with `readonly database`: stop container, delete `data.db-wal` + `data.db-shm`, restart |
+| Service | Config location | Suggested `deploy-*` scope |
+| --- | --- | --- |
+| **Seerr** | `services/seerr/config/` | `deploy-seerr.yml` — Jellyfin link, Sonarr/Radarr, OIDC |
+| **Sparky Fitness** | DB + uploads + Compose env | `deploy-sparkyfitness.yml` — DB passwords, auth secrets from `homelab.yaml` |
+| **McClean** | `services/mccleanengineering/data/` | `deploy-mcclean.yml` — `mcclean.admin_*` from `homelab.yaml`. **If login fails** with `readonly database`: stop container, delete `data.db-wal` + `data.db-shm`, restart |
 
 ---
 
 ## Suggested migration order
 
-Work top-to-bottom; each step should leave the stack usable.
+Most services are done. Remaining work:
 
-1. **Authelia** — everything depends on SSO
-2. ~~**Traefik**~~ — done (static + Authelia middleware in Ansible; service routes stay on Compose labels)
-3. ~~**Homepage**~~ — done (services template + static YAML + widget keys in `.env`)
-4. ~~**Gluetun**~~ — done (VPN in `.env`, auth roles in Ansible)
-5. ~~**Prowlarr**~~ — done (indexers from `homelab.yaml`; Sonarr/Radarr pull via Torznab)
-6. **Sonarr → Radarr → Bazarr** — *arr chain; share patterns (API + Torznab to Prowlarr)
-7. **Seerr** — depends on Jellyfin + *arr
-8. **Jellyfin** — libraries, OIDC, encoding (biggest remaining gap)
-9. **Audiobookshelf / Mealie** — OIDC clients overlap with Authelia work
-10. ~~**Uptime Kuma + Autokuma**~~ — done (AutoKuma monitors from labels; Ansible syncs `/status/default` groups)
-11. ~~**Memos**~~ — done (Authelia OIDC via `/etc/secrets`)
-12. ~~**Jellyscope**~~ — done (admin + Jellyfin key from Ansible)
-13. **Sparky Fitness / McClean** — as needed
+1. ~~**Authelia + Traefik**~~ — done
+2. ~~**Uptime Kuma + Autokuma**~~ — done
+3. ~~**OIDC apps** (Memos, Audiobookshelf, Mealie, Paperless)~~ — done
+4. ~~**Gluetun + *arr stack** (Prowlarr → Sonarr → Radarr → Bazarr + qBittorrent)~~ — done
+5. ~~**Dispatcharr + Jellyfin + Jellyscope**~~ — done
+6. ~~**Homepage**~~ — done (includes Paperless tile)
+7. **Seerr** — depends on Jellyfin + *arr (next priority)
+8. **Sparky Fitness / McClean** — as needed
 
 ---
 
